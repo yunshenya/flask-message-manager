@@ -1,3 +1,5 @@
+import datetime
+
 from flask import jsonify, request
 from app.api import bp
 from app import db
@@ -69,3 +71,97 @@ def execute_url(url_id):
         })
 
     return jsonify({'error': 'Failed to execute'}), 500
+
+
+@bp.route('/url/<int:url_id>', methods=['GET'])
+@login_required
+def get_url(url_id):
+    """获取单个URL信息"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        return jsonify({
+            'url_data': url.to_dict()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/url/<int:url_id>', methods=['PUT'])
+@login_required
+def update_url(url_id):
+    """更新URL信息"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # 更新字段
+        if 'url' in data:
+            url.url = data['url']
+        if 'name' in data:
+            url.name = data['name']
+        if 'duration' in data:
+            url.duration = data['duration']
+        if 'max_num' in data:
+            url.max_num = data['max_num']
+        if 'is_active' in data:
+            url.is_active = data['is_active']
+
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'URL updated successfully',
+            'url_data': url.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/url/<int:url_id>', methods=['DELETE'])
+@login_required
+def delete_url(url_id):
+    """删除URL"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        name = url.name
+        db.session.delete(url)
+        db.session.commit()
+
+        return jsonify({
+            'message': f'URL "{name}" deleted successfully'
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/url/<int:url_id>/reset', methods=['POST'])
+@login_required
+def reset_url_count(url_id):
+    """重置单个URL计数"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        url.current_count = 0
+        url.last_time = None
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'URL "{url.name}" count reset successfully',
+            'url_data': url.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

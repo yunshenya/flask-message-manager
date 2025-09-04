@@ -35,6 +35,12 @@
         .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
         .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
         .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .url-actions { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+        .url-meta { margin-top: 0.25rem; }
+        .url-meta small { color: #666; }
     </style>
 </head>
 <body>
@@ -119,6 +125,40 @@
             <div style="text-align: right;">
                 <button type="button" onclick="hideAddUrlModal()" class="btn btn-danger">取消</button>
                 <button type="submit" class="btn btn-success">添加</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- 编辑URL模态框 -->
+<div id="editUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
+        <h3>编辑URL</h3>
+        <form onsubmit="saveEditedUrl(event)">
+            <input type="hidden" id="editUrlId">
+            <div style="margin-bottom: 1rem;">
+                <label>URL:</label>
+                <input type="url" id="editUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>名称:</label>
+                <input type="text" id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>持续时间(秒):</label>
+                <input type="number" id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>最大执行次数:</label>
+                <input type="number" id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <label>
+                    <input type="checkbox" id="editIsActive"> 激活状态
+                </label>
+            </div>
+            <div style="text-align: right;">
+                <button type="button" onclick="hideEditUrlModal()" class="btn btn-danger">取消</button>
+                <button type="submit" class="btn btn-success">保存</button>
             </div>
         </form>
     </div>
