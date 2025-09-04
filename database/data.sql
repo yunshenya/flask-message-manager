@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS url_data (
                                         url VARCHAR(500) NOT NULL,
                                         name VARCHAR(200) NOT NULL,
                                         duration INTEGER NOT NULL DEFAULT 30,
-                                        last_time TIMESTAMP,
+                                        last_time TIMESTAMP  NOT NULL DEFAULT now(),
                                         max_num INTEGER NOT NULL DEFAULT 3,
                                         current_count INTEGER DEFAULT 0,
                                         is_active BOOLEAN DEFAULT TRUE,

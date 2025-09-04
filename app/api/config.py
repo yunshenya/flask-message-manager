@@ -29,6 +29,7 @@ def get_config():
             })
         return jsonify({'success_time': [5, 10], 'reset_time': 0, 'urldata': []}), 200
 
+
 @bp.route('/config/<int:config_id>/urls', methods=['GET'])
 @login_required
 def get_config_urls(config_id):
@@ -51,10 +52,12 @@ def get_config_urls(config_id):
             'urls': [url.to_dict() for url in urls],
             'total': len(urls),
             'active': len([url for url in urls if url.is_active]),
-            'available': len([url for url in urls if url.can_execute() and url.is_active])
+            'available': len([url for url in urls if url.can_execute() and url.is_active]),
+            'pade_code': config.pade_code
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/config/<int:config_id>/status', methods=['GET'])
 @login_required
@@ -73,13 +76,13 @@ def get_config_status(config_id):
             'available_urls': len([url for url in urls if url.can_execute()]),
             'completed_urls': len([url for url in urls if url.current_count >= url.max_num]),
             'total_executions': sum(url.current_count for url in urls),
-            'max_possible_executions': sum(url.max_num for url in urls),
-            "pad_code": config.pade_code,
+            'max_possible_executions': sum(url.max_num for url in urls)
         }
 
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/config/<int:config_id>/reset', methods=['POST'])
 @login_required

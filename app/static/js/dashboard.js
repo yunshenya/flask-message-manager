@@ -163,10 +163,11 @@ async function loadDashboardData() {
                     </div>
                     <div class="url-actions">
                         ${url.can_execute ?
-            `<button class="btn btn-primary btn-sm" onclick="executeUrl(${url.id})">执行</button>` :
+            `<button class="btn btn-primary btn-sm" onclick="executeUrl(${url.id}})">执行</button>` :
             `<span class="btn btn-warning btn-sm">已完成</span>`
         }
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
+                        <button class="btn btn-info btn-sm" onclick="start(${url.pade_code})" >开始</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
                         <button class="btn btn-danger btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
                     </div>
@@ -242,3 +243,27 @@ function refreshData() {
 
 // 页面加载时初始化数据
 document.addEventListener('DOMContentLoaded', loadDashboardData);
+
+
+async function start(pade_code) {
+    if (!pade_code) {
+        alert('请提供pade_code参数');
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/start`, {
+            method: 'POST',
+            body: JSON.stringify({
+                pade_code: pade_code  // 发送JSON数据
+            })
+        });
+
+        alert('启动成功: ' + result.message);
+        isSystemRunning = true;
+        updateSystemControls();
+        await loadDashboardData();
+    } catch (error) {
+        console.error('启动失败:', error);
+    }
+}

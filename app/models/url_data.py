@@ -22,7 +22,7 @@ class UrlData(db.Model):
             'url': self.url,
             'name': self.name,
             'duration': self.duration,
-            'last_time': self.last_time.isoformat() if self.last_time else None,
+            'Last_time': self.last_time.isoformat() if self.last_time else None,
             'max_num': self.max_num,
             'current_count': self.current_count,
             'is_active': self.is_active,

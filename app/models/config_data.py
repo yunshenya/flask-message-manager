@@ -31,6 +31,6 @@ class ConfigData(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'urldata': [url.to_dict() for url in self.urls if url.is_active],
-            'pad_code': self.pade_code,
+            'pade_code': self.pade_code,
             'message': self.message
         }
