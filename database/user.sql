@@ -17,5 +17,5 @@ CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active);
 
 -- 创建默认管理员用户
 INSERT INTO users (username, password_hash, email, is_admin)
-VALUES ('admin', 'ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d', 'admin@example.com', TRUE)
+VALUES ('admin', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', 'admin@example.com', TRUE)
 ON CONFLICT (username) DO NOTHING;

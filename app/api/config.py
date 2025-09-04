@@ -4,18 +4,21 @@ from app.api import bp
 from app import db
 from app.models.config_data import ConfigData
 from app.models.url_data import UrlData
-from app.auth.decorators import login_required
+from app.auth.decorators import login_required, token_required
+
 
 @bp.route('/config', methods=['GET'])
-@login_required
+@token_required
 def get_config():
     """获取配置数据"""
+    pade_code = request.args.get('pade_code')
+    print(pade_code)
     config_id = request.args.get('config_id', type=int)
     if config_id:
         config = db.session.get(ConfigData, config_id)
         if not config:
             return jsonify({'error': 'Config not found'}), 404
-        return jsonify(config.to_dict())
+        return jsonify(config.to_dict()), 200
     else:
         config = ConfigData.query.filter_by(is_active=True).first()
         if config:
@@ -24,7 +27,7 @@ def get_config():
                 'reset_time': config.reset_time,
                 'urldata': [url.to_dict() for url in config.urls if url.is_active]
             })
-        return jsonify({'success_time': [5, 10], 'reset_time': 0, 'urldata': []})
+        return jsonify({'success_time': [5, 10], 'reset_time': 0, 'urldata': []}), 200
 
 @bp.route('/config/<int:config_id>/urls', methods=['GET'])
 @login_required
@@ -70,7 +73,8 @@ def get_config_status(config_id):
             'available_urls': len([url for url in urls if url.can_execute()]),
             'completed_urls': len([url for url in urls if url.current_count >= url.max_num]),
             'total_executions': sum(url.current_count for url in urls),
-            'max_possible_executions': sum(url.max_num for url in urls)
+            'max_possible_executions': sum(url.max_num for url in urls),
+            "pad_code": config.pade_code,
         }
 
         return jsonify(stats)

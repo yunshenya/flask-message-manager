@@ -12,14 +12,16 @@
 -- 主配置表
 -- ================================
 CREATE TABLE IF NOT EXISTS config_data (
-                                           id SERIAL PRIMARY KEY,
-                                           success_time_min INTEGER NOT NULL DEFAULT 5,
+                                            id SERIAL PRIMARY KEY,
+                                            success_time_min INTEGER NOT NULL DEFAULT 5,
                                            success_time_max INTEGER NOT NULL DEFAULT 10,
                                            reset_time INTEGER NOT NULL DEFAULT 0,
                                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                            is_active BOOLEAN DEFAULT TRUE,
-                                           description TEXT
+                                           pade_code TEXT,
+                                           description TEXT,
+                                           message varchar(100)
 );
 
 -- 为配置表添加注释
@@ -91,29 +93,7 @@ CREATE TRIGGER update_url_data_updated_at
     FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
--- ================================
--- 插入初始数据
--- ================================
 
--- 插入配置数据
-INSERT INTO config_data (success_time_min, success_time_max, reset_time, description)
-VALUES (5, 10, 0, '默认配置数据')
-ON CONFLICT DO NOTHING;
-
--- 获取刚插入的配置ID（或现有的第一个配置ID）
--- 插入URL数据示例（取消注释以使用）
-/*
-INSERT INTO url_data (config_id, url, name, duration, max_num) VALUES
-    (1, 'https://t.me/baolidb', '保利担保', 30, 3),
-    (1, 'https://t.me/zhonghua2014tianxiang', '中华天象', 30, 3),
-    (1, 'https://t.me/lianheshequ424', '联合社区', 30, 3),
-    (1, 'https://t.me/make_friends1', 'make_friends', 30, 3)
-ON CONFLICT DO NOTHING;
-*/
-
--- ================================
--- 查询数据的视图
--- ================================
 CREATE OR REPLACE VIEW config_with_urls AS
 SELECT
     c.id as config_id,
@@ -191,40 +171,3 @@ BEGIN
     WHERE (config_id_param IS NULL OR config_id = config_id_param);
 END;
 $$ LANGUAGE plpgsql;
-
--- ================================
--- 示例查询语句
--- ================================
-
--- 查看配置数据（视图）
--- SELECT * FROM config_with_urls;
-
--- 获取JSON格式的配置
--- SELECT get_config_json();
--- SELECT get_config_json(1);
-
--- 查看所有URL数据
--- SELECT * FROM url_data WHERE is_active = TRUE ORDER BY id;
-
--- 查看特定配置的URL数据
--- SELECT * FROM url_data WHERE config_id = 1 AND is_active = TRUE;
-
--- 更新URL执行记录
--- SELECT update_url_execution(1);
-
--- 重置所有计数
--- SELECT reset_url_counts();
-
--- 重置特定配置的计数
--- SELECT reset_url_counts(1);
-
--- ================================
--- 数据维护
--- ================================
-
--- 清理过期数据（可根据需要调整时间）
--- DELETE FROM url_data WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '30 days' AND is_active = FALSE;
-
--- 备份重要数据
--- COPY config_data TO '/path/to/config_backup.csv' DELIMITER ',' CSV HEADER;
--- COPY url_data TO '/path/to/url_backup.csv' DELIMITER ',' CSV HEADER;

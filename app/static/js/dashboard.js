@@ -88,9 +88,9 @@ async function saveEditedUrl(event) {
             body: JSON.stringify(data)
         });
 
-        alert('URL更新成功!');
+        alert('URL更新成功!' + JSON.stringify(result));
         hideEditUrlModal();
-        loadDashboardData(); // 重新加载数据
+        await loadDashboardData(); // 重新加载数据
     } catch (error) {
         // 错误已在apiCall中处理
     }
@@ -108,7 +108,7 @@ async function deleteUrl(urlId, urlName) {
         });
 
         alert('URL删除成功!');
-        loadDashboardData(); // 重新加载数据
+        await loadDashboardData(); // 重新加载数据
     } catch (error) {
         // 错误已在apiCall中处理
     }
@@ -126,7 +126,7 @@ async function resetUrlCount(urlId, urlName) {
         });
 
         alert('URL计数重置成功!');
-        loadDashboardData(); // 重新加载数据
+        await loadDashboardData(); // 重新加载数据
     } catch (error) {
         // 错误已在apiCall中处理
     }
@@ -182,7 +182,7 @@ async function executeUrl(urlId) {
     try {
         const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
         alert('执行成功: ' + result.message);
-        loadDashboardData();
+        await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
     }
@@ -194,7 +194,7 @@ async function resetAllUrls() {
     try {
         const result = await apiCall('/api/config/1/reset', { method: 'POST' });
         alert(result.message);
-        loadDashboardData();
+        await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
     }
@@ -228,14 +228,16 @@ async function addUrl(event) {
         alert('URL添加成功!');
         hideAddUrlModal();
         document.querySelector('#addUrlModal form').reset();
-        loadDashboardData();
+        await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
     }
 }
 
 function refreshData() {
-    loadDashboardData();
+    loadDashboardData().then(r => {
+        alert("刷星数据")
+    });
 }
 
 // 页面加载时初始化数据

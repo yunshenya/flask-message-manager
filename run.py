@@ -1,5 +1,3 @@
-from waitress import serve
-
 from app import create_app, db
 from app.models import User, ConfigData, UrlData
 
@@ -27,10 +25,13 @@ def init_database():
             config = ConfigData.query.first()
             if not config:
                 config = ConfigData(
+                    message = "哈咯----签到",
                     success_time_min=5,
                     success_time_max=10,
                     reset_time=0,
-                    description='默认配置数据'
+                    description='默认配置数据',
+                    pade_code='AC32010960163',
+
                 )
                 db.session.add(config)
                 db.session.flush()
@@ -63,4 +64,4 @@ def init_database():
 if __name__ == '__main__':
     if init_database():
         print("📍 访问地址: http://localhost:5000")
-    serve(app, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
