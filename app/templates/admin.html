@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>系统管理</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .header { background: #dc3545; color: white; padding: 1rem 2rem; margin: -20px -20px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0.25rem; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; color: #555; }
+        input, select { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>系统管理</h1>
+    <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">返回仪表板</a>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h2>创建用户</h2>
+        <form method="POST" action="{{ url_for('admin.create_user') }}">
+            <div class="form-group">
+                <label>用户名:</label>
+                <input type="text" name="username" required>
+            </div>
+            <div class="form-group">
+                <label>密码:</label>
+                <input type="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label>邮箱:</label>
+                <input type="email" name="email">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="is_admin"> 管理员权限
+                </label>
+            </div>
+            <button type="submit" class="btn btn-success">创建用户</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>用户管理</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>邮箱</th>
+                <th>管理员</th>
+                <th>状态</th>
+                <th>最后登录</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.email or '-' }}</td>
+                <td>{{ '是' if user.is_admin else '否' }}</td>
+                <td>{{ '激活' if user.is_active else '禁用' }}</td>
+                <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '从未' }}</td>
+                <td>
+                    {% if user.id != session.user_id %}
+                    <a href="{{ url_for('admin.toggle_user_status', user_id=user.id) }}"
+                       class="btn btn-warning">
+                        {{ '禁用' if user.is_active else '激活' }}
+                    </a>
+                    <a href="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                       class="btn btn-danger"
+                       onclick="return confirm('确定删除用户 {{ user.username }} 吗？')">
+                        删除
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>
