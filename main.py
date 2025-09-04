@@ -1,12 +1,14 @@
 import datetime
-import json
+import hashlib
 import os
+from functools import wraps
+from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string, session, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import text
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', '1234567')
 
 DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://postgres:1332@localhost:5432/postgres')
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -15,7 +17,38 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # 初始化数据库
 db = SQLAlchemy(app)
 
-# 定义用户模型
+# ==================== 用户模型 ====================
+class User(db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
+    is_admin = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now())
+    last_login = db.Column(db.DateTime)
+
+    @staticmethod
+    def hash_password(password):
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def check_password(self, password):
+        return self.password_hash == self.hash_password(password)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'is_admin': self.is_admin,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None
+        }
+
+# 原有模型保持不变
 class ConfigData(db.Model):
     __tablename__ = 'config_data'
 
@@ -24,13 +57,11 @@ class ConfigData(db.Model):
     success_time_max = db.Column(db.Integer, nullable=False, default=10)
     reset_time = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, default=datetime.datetime.now())
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now())
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.now())
     is_active = db.Column(db.Boolean, default=True)
     description = db.Column(db.Text)
-    # extra_config = db.Column(JSONB, default={})  # 如果需要的话取消注释
 
-    # 关联关系
-    urls = db.relationship('UrlData', backref='config', cascade='all, delete-orphan')
+    urls : Any = db.relationship('UrlData', backref='config', cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -57,7 +88,7 @@ class UrlData(db.Model):
     current_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.now())
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.now(), onupdate=datetime.datetime.now())
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.now())
 
     def to_dict(self):
         return {
@@ -73,24 +104,10 @@ class UrlData(db.Model):
             'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith('https://t.me/') else self.url
         }
 
-    @property
-    def is_telegram_url(self):
-        """检查是否为 Telegram URL"""
-        return self.url.startswith('https://t.me/')
-
-    @property
-    def telegram_username(self):
-        """提取 Telegram 用户名/频道名"""
-        if self.is_telegram_url:
-            return self.url.replace('https://t.me/', '')
-        return None
-
     def can_execute(self):
-        """检查是否还能执行"""
         return self.current_count < self.max_num
 
     def execute(self):
-        """执行并更新计数"""
         if self.can_execute():
             self.current_count += 1
             self.last_time = datetime.datetime.now()
@@ -98,419 +115,407 @@ class UrlData(db.Model):
             return True
         return False
 
-# 调用数据库中的函数（修正版本）
-def get_config_json(config_id=None):
-    """调用数据库中的 get_config_json 函数"""
-    try:
-        if config_id:
-            result = db.session.execute(
-                text("SELECT get_config_json(:config_id)"),
-                {'config_id': config_id}
-            ).scalar()
-        else:
-            result = db.session.execute(text("SELECT get_config_json()")).scalar()
+# ==================== 认证装饰器 ====================
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.is_json:
+                return jsonify({'error': 'Authentication required', 'login_url': '/login'}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-        return result
-    except Exception as E:
-        print(f"数据库函数调用错误: {E}")
-        # 如果数据库函数不存在，使用ORM方式作为fallback
-        return get_config_json_orm(config_id)
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            if request.is_json:
+                return jsonify({'error': 'Authentication required', 'login_url': '/login'}), 401
+            return redirect(url_for('login'))
 
-def get_config_json_orm(config_id=None):
-    """使用ORM方式获取配置数据（fallback）"""
-    try:
-        if config_id:
-            config = ConfigData.query.filter_by(id=config_id, is_active=True).first()
-        else:
-            config = ConfigData.query.filter_by(is_active=True).first()
+        user = db.session.get(User, session['user_id'])
+        if not user or not user.is_admin:
+            if request.is_json:
+                return jsonify({'error': 'Admin access required'}), 403
+            flash('需要管理员权限')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated_function
 
-        if config:
-            return {
-                'success_time': [config.success_time_min, config.success_time_max],
-                'reset_time': config.reset_time,
-                'urldata': [url.to_dict() for url in config.urls if url.is_active]
-            }
-        else:
-            return {'success_time': [5, 10], 'reset_time': 0, 'urldata': []}
-    except Exception as e:
-        print(f"ORM查询错误: {e}")
-        return {'success_time': [5, 10], 'reset_time': 0, 'urldata': []}
+# ==================== HTML模板 ====================
+LOGIN_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>消息管理系统 - 登录</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 400px; margin: 100px auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #555; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #0056b3; }
+        .alert { padding: 10px; margin-bottom: 20px; border-radius: 4px; }
+        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>消息管理系统</h1>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-danger">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">用户名:</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">密码:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">登录</button>
+        </form>
+    </div>
+</body>
+</html>
+'''
 
-def update_url_execution(url_id):
-    """调用数据库中的 update_url_execution 函数"""
-    try:
-        db.session.execute(
-            text("SELECT update_url_execution(:url_id)"),
-            {'url_id': url_id}
-        )
-        db.session.commit()
-        return True
-    except Exception as E:
-        print(f"数据库函数调用错误: {E}")
-        db.session.rollback()
-        # 使用ORM方式作为fallback
-        try:
-            url = UrlData.query.get(url_id)
-            if url and url.execute():
-                db.session.commit()
-                return True
-        except Exception as orm_error:
-            print(f"ORM更新错误: {orm_error}")
-            db.session.rollback()
-        return False
+DASHBOARD_TEMPLATE = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>消息管理系统 - 仪表板</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .header { background: #007bff; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; }
+        .user-info { display: flex; align-items: center; gap: 1rem; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: bold; color: #007bff; }
+        .stat-label { color: #666; margin-top: 0.5rem; }
+        .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .action-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .action-card h3 { margin-top: 0; color: #333; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0.25rem; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .url-list { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .url-item { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .url-item:last-child { border-bottom: none; }
+        .url-info { flex: 1; }
+        .url-name { font-weight: bold; color: #333; }
+        .url-link { color: #666; font-size: 0.9rem; }
+        .url-stats { display: flex; gap: 1rem; align-items: center; }
+        .progress { background: #e9ecef; height: 6px; border-radius: 3px; overflow: hidden; width: 100px; }
+        .progress-bar { background: #007bff; height: 100%; transition: width 0.3s; }
+        .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>消息管理系统</h1>
+        <div class="user-info">
+            <span>欢迎, {{ current_user.username }}</span>
+            {% if current_user.is_admin %}<span class="btn btn-warning">管理员</span>{% endif %}
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">退出</a>
+        </div>
+    </div>
 
-def reset_url_counts(config_id=None):
-    """调用数据库中的 reset_url_counts 函数"""
-    try:
-        if config_id:
-            db.session.execute(
-                text("SELECT reset_url_counts(:config_id)"),
-                {'config_id': config_id}
-            )
-        else:
-            db.session.execute(text("SELECT reset_url_counts()"))
-        db.session.commit()
-        return True
-    except Exception as E:
-        print(f"数据库函数调用错误: {E}")
-        db.session.rollback()
-        # 使用ORM方式作为fallback
-        try:
-            query = UrlData.query
-            if config_id:
-                query = query.filter_by(config_id=config_id)
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-success">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
-            query.update({
-                'current_count': 0,
-                'last_time': None,
-                'updated_at': datetime.datetime.now()
-            })
-            db.session.commit()
-            return True
-        except Exception as orm_error:
-            print(f"ORM重置错误: {orm_error}")
-            db.session.rollback()
-            return False
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalUrls">-</div>
+                <div class="stat-label">总URL数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="availableUrls">-</div>
+                <div class="stat-label">可执行URL</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalExecutions">-</div>
+                <div class="stat-label">总执行次数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completedUrls">-</div>
+                <div class="stat-label">已完成URL</div>
+            </div>
+        </div>
 
-# 使用视图查询（修正版本）
-def get_config_with_urls():
-    """查询 config_with_urls 视图"""
-    try:
-        result = db.session.execute(text("""
-                                            SELECT config_id, success_time_min, success_time_max,
-                                                reset_time, description, urldata::text
-                                            FROM config_with_urls
-                                            ORDER BY config_id
-                                            """)).fetchall()
+        <div class="actions">
+            <div class="action-card">
+                <h3>URL管理</h3>
+                <a href="#" onclick="showAddUrlModal()" class="btn btn-success">添加URL</a>
+                <a href="#" onclick="refreshData()" class="btn btn-primary">刷新数据</a>
+                <a href="#" onclick="resetAllUrls()" class="btn btn-warning">重置所有计数</a>
+            </div>
+            <div class="action-card">
+                <h3>批量操作</h3>
+                <a href="#" onclick="showBatchAddModal()" class="btn btn-success">批量添加</a>
+                <a href="#" onclick="executeAvailable()" class="btn btn-primary">执行可用URL</a>
+                <a href="/admin" class="btn btn-warning">系统管理</a>
+            </div>
+        </div>
 
-        configs = []
-        for row in result:
-            config = {
-                'config_id': row[0],
-                'success_time': [row[1], row[2]],
-                'reset_time': row[3],
-                'description': row[4],
-                'urldata': json.loads(row[5]) if row[5] else []
-            }
-            configs.append(config)
+        <div class="url-list" id="urlList">
+            <!-- URL列表将通过JavaScript动态加载 -->
+        </div>
+    </div>
 
-        return configs
-    except Exception as e:
-        print(f"视图查询错误: {e}")
-        # 使用ORM方式作为fallback
-        try:
-            configs = ConfigData.query.filter_by(is_active=True).all()
-            return [config.to_dict() for config in configs]
-        except Exception as orm_error:
-            print(f"ORM查询错误: {orm_error}")
-            return []
+    <!-- 添加URL模态框 -->
+    <div id="addUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
+            <h3>添加新URL</h3>
+            <form onsubmit="addUrl(event)">
+                <div style="margin-bottom: 1rem;">
+                    <label>URL:</label>
+                    <input type="url" id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label>名称:</label>
+                    <input type="text" id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label>持续时间(秒):</label>
+                    <input type="number" id="newDuration" value="30" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label>最大执行次数:</label>
+                    <input type="number" id="newMaxNum" value="3" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="text-align: right;">
+                    <button type="button" onclick="hideAddUrlModal()" class="btn btn-danger">取消</button>
+                    <button type="submit" class="btn btn-success">添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-def init_sample_data():
-    """初始化示例数据"""
-    try:
-        # 检查是否已有配置
-        config = ConfigData.query.first()
-        if not config:
-            config = ConfigData(
-                success_time_min=5,
-                success_time_max=10,
-                reset_time=0,
-                description='默认配置数据'
-            )
-            db.session.add(config)
-            db.session.flush()  # 获取ID但不提交
+    <script>
+        // JavaScript代码用于动态交互
+        const API_BASE = '';
 
-        # 检查是否已有URL数据
-        if UrlData.query.count() == 0:
-            telegram_urls = [
-                {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
-                {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
-                {'url': 'https://t.me/lianheshequ424', 'name': '联合社区', 'duration': 30, 'max_num': 3},
-                {'url': 'https://t.me/make_friends1', 'name': 'make_friends', 'duration': 30, 'max_num': 3}
-            ]
-
-            for url_data in telegram_urls:
-                url = UrlData(
-                    config_id=config.id,
-                    **url_data
-                )
-                db.session.add(url)
-
-        db.session.commit()
-        print("示例数据初始化完成!")
-        return True
-    except Exception as e:
-        print(f"初始化数据时出错: {e}")
-        db.session.rollback()
-        return False
-
-# API路由
-@app.route('/')
-def index():
-    """首页"""
-    return jsonify({
-        'message': 'Flask Message Manager API',
-        'status': 'running',
-        'endpoints': {
-            'config': '/api/config',
-            'config_full': '/api/config/full',
-            'config_by_id': '/api/config/{id}',
-            'create_config': 'POST /api/config',
-            'execute_url': 'POST /api/url/{id}/execute',
-            'reset_config': 'POST /api/config/{id}/reset',
-            'update_extra': 'PUT /api/config/{id}/extra',
-            'search_configs': '/api/configs/search',
-            'telegram_channels': '/api/config/{id}/telegram',
-            'available_urls': '/api/urls/available',
-            'config_status': '/api/config/{id}/status',
-            'url_management': {
-                'create_url': 'POST /api/url',
-                'get_url': 'GET /api/url/{id}',
-                'update_url': 'PUT /api/url/{id}',
-                'delete_url': 'DELETE /api/url/{id}',
-                'reset_url': 'POST /api/url/{id}/reset',
-                'get_config_urls': 'GET /api/config/{id}/urls',
-                'batch_create': 'POST /api/config/{id}/urls/batch'
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('API调用错误:', error);
+                alert('操作失败: ' + error.message);
+                throw error;
             }
         }
-    })
 
+        async function loadDashboardData() {
+            try {
+                const [statusData, urlsData] = await Promise.all([
+                    apiCall('/api/config/1/status'),
+                    apiCall('/api/config/1/urls')
+                ]);
+
+                // 更新统计数据
+                document.getElementById('totalUrls').textContent = statusData.total_urls;
+                document.getElementById('availableUrls').textContent = statusData.available_urls;
+                document.getElementById('totalExecutions').textContent = statusData.total_executions;
+                document.getElementById('completedUrls').textContent = statusData.completed_urls;
+
+                // 更新URL列表
+                const urlList = document.getElementById('urlList');
+                urlList.innerHTML = urlsData.urls.map(url => `
+                    <div class="url-item">
+                        <div class="url-info">
+                            <div class="url-name">${url.name}</div>
+                            <div class="url-link">${url.url}</div>
+                        </div>
+                        <div class="url-stats">
+                            <span>${url.current_count}/${url.max_num}</span>
+                            <div class="progress">
+                                <div class="progress-bar" style="width: ${(url.current_count / url.max_num) * 100}%"></div>
+                            </div>
+                            ${url.can_execute ? 
+                                `<button class="btn btn-primary" onclick="executeUrl(${url.id})">执行</button>` : 
+                                `<span class="btn btn-warning">已完成</span>`
+                            }
+                            <button class="btn btn-danger" onclick="editUrl(${url.id})">编辑</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载数据失败:', error);
+            }
+        }
+
+        async function executeUrl(urlId) {
+            try {
+                const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
+                alert('执行成功: ' + result.message);
+                loadDashboardData();
+            } catch (error) {
+                // 错误已在apiCall中处理
+            }
+        }
+
+        async function resetAllUrls() {
+            if (!confirm('确定要重置所有URL的执行计数吗？')) return;
+            
+            try {
+                const result = await apiCall('/api/config/1/reset', { method: 'POST' });
+                alert(result.message);
+                loadDashboardData();
+            } catch (error) {
+                // 错误已在apiCall中处理
+            }
+        }
+
+        function showAddUrlModal() {
+            document.getElementById('addUrlModal').style.display = 'block';
+        }
+
+        function hideAddUrlModal() {
+            document.getElementById('addUrlModal').style.display = 'none';
+        }
+
+        async function addUrl(event) {
+            event.preventDefault();
+            
+            const data = {
+                config_id: 1,
+                url: document.getElementById('newUrl').value,
+                name: document.getElementById('newName').value,
+                duration: parseInt(document.getElementById('newDuration').value),
+                max_num: parseInt(document.getElementById('newMaxNum').value)
+            };
+
+            try {
+                const result = await apiCall('/api/url', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                
+                alert('URL添加成功!');
+                hideAddUrlModal();
+                document.querySelector('#addUrlModal form').reset();
+                loadDashboardData();
+            } catch (error) {
+                // 错误已在apiCall中处理
+            }
+        }
+
+        function refreshData() {
+            loadDashboardData();
+        }
+
+        // 页面加载时初始化数据
+        document.addEventListener('DOMContentLoaded', loadDashboardData);
+    </script>
+</body>
+</html>
+'''
+
+# ==================== 认证路由 ====================
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        user = User.query.filter_by(username=username, is_active=True).first()
+
+        if user and user.check_password(password):
+            session['user_id'] = user.id
+            user.last_login = datetime.datetime.now()
+            db.session.commit()
+
+            flash('登录成功!')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('用户名或密码错误')
+
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('已退出登录')
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    user = db.session.get(User, session['user_id'])
+    return render_template_string(DASHBOARD_TEMPLATE, current_user=user)
+
+@app.route('/')
+def index():
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+# ==================== API路由（需要认证） ====================
 @app.route('/api/config', methods=['GET'])
+@login_required
 def get_config():
     """获取配置数据"""
     config_id = request.args.get('config_id', type=int)
-    config_json = get_config_json(config_id)
-    return jsonify(config_json)
-
-@app.route('/api/config/full', methods=['GET'])
-def get_config_full():
-    """获取完整配置数据（使用视图）"""
-    configs = get_config_with_urls()
-    return jsonify(configs)
-
-@app.route('/api/config/<int:config_id>', methods=['GET'])
-def get_config_by_id(config_id):
-    """通过ORM获取特定配置"""
-    config = ConfigData.query.filter_by(id=config_id, is_active=True).first()
-    if not config:
-        return jsonify({'error': 'Config not found'}), 404
-
-    return jsonify(config.to_dict())
-
-@app.route('/api/config', methods=['POST'])
-def create_config():
-    """创建新配置"""
-    try:
-        data = request.json
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-
-        config = ConfigData(
-            success_time_min=data.get('success_time_min', 5),
-            success_time_max=data.get('success_time_max', 10),
-            reset_time=data.get('reset_time', 0),
-            description=data.get('description')
-        )
-
-        # 如果有URL数据
-        if 'urldata' in data:
-            for url_data in data['urldata']:
-                url = UrlData(
-                    url=url_data['url'],
-                    name=url_data['name'],
-                    duration=url_data.get('duration', 30),
-                    max_num=url_data.get('max_num', 3)
-                )
-                config.urls.append(url)
-
-        db.session.add(config)
-        db.session.commit()
-
-        return jsonify(config.to_dict()), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/url/<int:url_id>/execute', methods=['POST'])
-def execute_url(url_id):
-    """执行URL并更新计数"""
-    url = db.session.get(UrlData, url_id)
-    if not url:
-        return jsonify({'error': 'URL not found'}), 404
-
-    if not url.can_execute():
-        return jsonify({
-            'error': 'URL has reached maximum execution count',
-            'current_count': url.current_count,
-            'max_num': url.max_num
-        }), 400
-
-    # 使用数据库函数或ORM更新
-    success = update_url_execution(url_id)
-
-    if success:
-        # 重新获取更新后的数据
-
-        url = db.session.get(UrlData, url_id)
-        return jsonify({
-            'message': f'Successfully executed {url.name}',
-            'url': url.url,
-            'current_count': url.current_count,
-            'remaining': url.max_num - url.current_count,
-            'last_time': url.last_time.isoformat() if url.last_time else None
-        })
-    else:
-        return jsonify({'error': 'Failed to update URL execution'}), 500
-
-@app.route('/api/config/<int:config_id>/reset', methods=['POST'])
-def reset_config_counts(config_id):
-    """重置配置的URL计数"""
-    success = reset_url_counts(config_id)
-    if success:
-        return jsonify({'message': 'Counts reset successfully'})
-    else:
-        return jsonify({'error': 'Failed to reset counts'}), 500
-
-@app.route('/api/config/<int:config_id>/extra', methods=['PUT'])
-def update_config_extra(config_id):
-    """更新配置的额外JSON数据"""
-    try:
-        data = request.json
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-
-        config = ConfigData.query.get(config_id)
+    if config_id:
+        config = db.session.get(ConfigData, config_id)
         if not config:
             return jsonify({'error': 'Config not found'}), 404
-
-        # 使用description字段存储JSON（如果没有extra_config字段）
-        if config.description:
-            try:
-                desc_data = json.loads(config.description)
-                desc_data.update(data)
-                config.description = json.dumps(desc_data, ensure_ascii=False)
-            except json.JSONDecodeError:
-                config.description = json.dumps(data, ensure_ascii=False)
-        else:
-            config.description = json.dumps(data, ensure_ascii=False)
-
-        db.session.commit()
         return jsonify(config.to_dict())
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/configs/search', methods=['GET'])
-def search_configs():
-    """根据字段搜索配置"""
-    try:
-        description = request.args.get('description')
-
-        query = ConfigData.query.filter_by(is_active=True)
-
-        if description:
-            query = query.filter(ConfigData.description.ilike(f'%{description}%'))
-
-        configs = query.all()
-        return jsonify([config.to_dict() for config in configs])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/config/<int:config_id>/telegram', methods=['GET'])
-def get_telegram_channels(config_id):
-    """获取所有Telegram频道"""
-    try:
-        channels = UrlData.query.filter(
-            UrlData.config_id == config_id,
-            UrlData.is_active == True,
-            UrlData.url.like('https://t.me/%')
-        ).all()
-
-        return jsonify({
-            'telegram_channels': [
-                {
-                    **url.to_dict(),
-                    'telegram_username': url.telegram_username
-                } for url in channels
-            ],
-            'count': len(channels)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/urls/available', methods=['GET'])
-def get_available_urls():
-    """获取所有可执行的URL"""
-    try:
-        config_id = request.args.get('config_id', 1, type=int)
-
-        urls = UrlData.query.filter(
-            UrlData.config_id == config_id,
-            UrlData.is_active == True,
-            UrlData.current_count < UrlData.max_num
-        ).order_by(UrlData.current_count.asc()).all()
-
-        return jsonify({
-            'available_urls': [url.to_dict() for url in urls],
-            'count': len(urls)
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/config/<int:config_id>/status', methods=['GET'])
-def get_config_status(config_id):
-    """获取配置状态统计"""
-    try:
-        config = ConfigData.query.get(config_id)
-        if not config:
-            return jsonify({'error': 'Config not found'}), 404
-
-        urls = UrlData.query.filter_by(config_id=config_id, is_active=True).all()
-
-        stats = {
-            'config': config.to_dict(),
-            'total_urls': len(urls),
-            'available_urls': len([url for url in urls if url.can_execute()]),
-            'completed_urls': len([url for url in urls if url.current_count >= url.max_num]),
-            'total_executions': sum(url.current_count for url in urls),
-            'max_possible_executions': sum(url.max_num for url in urls),
-            'execution_progress': {
-                url.name: {
-                    'current': url.current_count,
-                    'max': url.max_num,
-                    'percentage': (url.current_count / url.max_num * 100) if url.max_num > 0 else 0,
-                    'last_time': url.last_time.isoformat() if url.last_time else None
-                } for url in urls
-            }
-        }
-
-        return jsonify(stats)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# ==================== 新增的URL管理API ====================
+    else:
+        config = ConfigData.query.filter_by(is_active=True).first()
+        if config:
+            return jsonify({
+                'success_time': [config.success_time_min, config.success_time_max],
+                'reset_time': config.reset_time,
+                'urldata': [url.to_dict() for url in config.urls if url.is_active]
+            })
+        return jsonify({'success_time': [5, 10], 'reset_time': 0, 'urldata': []})
 
 @app.route('/api/url', methods=['POST'])
+@login_required
 def create_url():
     """创建新的URL数据"""
     try:
@@ -518,18 +523,15 @@ def create_url():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
 
-        # 验证必填字段
         required_fields = ['config_id', 'url', 'name']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
 
-        # 检查config_id是否存在
         config = db.session.get(ConfigData, data['config_id'])
         if not config:
             return jsonify({'error': 'Config not found'}), 404
 
-        # 创建新URL
         new_url = UrlData(
             config_id=data['config_id'],
             url=data['url'],
@@ -550,74 +552,35 @@ def create_url():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/url/<int:url_id>', methods=['PUT'])
-def update_url(url_id):
-    """更新URL数据"""
-    try:
-        data = request.json
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
+@app.route('/api/url/<int:url_id>/execute', methods=['POST'])
+@login_required
+def execute_url(url_id):
+    """执行URL并更新计数"""
+    url = db.session.get(UrlData, url_id)
+    if not url:
+        return jsonify({'error': 'URL not found'}), 404
 
-        url = db.session.get(UrlData, url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
-
-        # 更新字段
-        if 'url' in data:
-            url.url = data['url']
-        if 'name' in data:
-            url.name = data['name']
-        if 'duration' in data:
-            url.duration = data['duration']
-        if 'max_num' in data:
-            url.max_num = data['max_num']
-        if 'is_active' in data:
-            url.is_active = data['is_active']
-        if 'current_count' in data:
-            url.current_count = data['current_count']
-
-        url.updated_at = datetime.datetime.now()
-        db.session.commit()
-
+    if not url.can_execute():
         return jsonify({
-            'message': 'URL updated successfully',
-            'url_data': url.to_dict()
-        })
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+            'error': 'URL has reached maximum execution count',
+            'current_count': url.current_count,
+            'max_num': url.max_num
+        }), 400
 
-@app.route('/api/url/<int:url_id>', methods=['DELETE'])
-def delete_url(url_id):
-    """删除URL数据（软删除）"""
-    try:
-        url = UrlData.query.get(url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
-
-        # 软删除：设置is_active为False
-        url.is_active = False
-        url.updated_at = datetime.datetime.now()
+    if url.execute():
         db.session.commit()
+        return jsonify({
+            'message': f'Successfully executed {url.name}',
+            'url': url.url,
+            'current_count': url.current_count,
+            'remaining': url.max_num - url.current_count,
+            'last_time': url.last_time.isoformat() if url.last_time else None
+        })
 
-        return jsonify({'message': f'URL {url.name} deleted successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/url/<int:url_id>', methods=['GET'])
-def get_url_by_id(url_id):
-    """获取特定URL的详细信息"""
-    try:
-        url = UrlData.query.get(url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
-
-        return jsonify(url.to_dict())
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return jsonify({'error': 'Failed to execute'}), 500
 
 @app.route('/api/config/<int:config_id>/urls', methods=['GET'])
+@login_required
 def get_config_urls(config_id):
     """获取配置的所有URL"""
     try:
@@ -625,17 +588,11 @@ def get_config_urls(config_id):
         if not config:
             return jsonify({'error': 'Config not found'}), 404
 
-        # 获取查询参数
         include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
-        url_type = request.args.get('type')  # 'telegram' 或 'all'
 
         query = UrlData.query.filter_by(config_id=config_id)
-
         if not include_inactive:
             query = query.filter_by(is_active=True)
-
-        if url_type == 'telegram':
-            query = query.filter(UrlData.url.like('https://t.me/%'))
 
         urls = query.order_by(UrlData.id).all()
 
@@ -649,116 +606,594 @@ def get_config_urls(config_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/config/<int:config_id>/urls/batch', methods=['POST'])
-def batch_create_urls(config_id):
-    """批量创建URL"""
+@app.route('/api/config/<int:config_id>/status', methods=['GET'])
+@login_required
+def get_config_status(config_id):
+    """获取配置状态统计"""
     try:
-        data = request.json
-        if not data or 'urls' not in data:
-            return jsonify({'error': 'No URLs data provided'}), 400
-
         config = db.session.get(ConfigData, config_id)
         if not config:
             return jsonify({'error': 'Config not found'}), 404
 
-        created_urls = []
-        errors = []
+        urls = UrlData.query.filter_by(config_id=config_id, is_active=True).all()
 
-        for i, url_data in enumerate(data['urls']):
-            try:
-                # 验证必填字段
-                if 'url' not in url_data or 'name' not in url_data:
-                    errors.append(f'URL {i+1}: Missing url or name')
-                    continue
-
-                new_url = UrlData(
-                    config_id=config_id,
-                    url=url_data['url'],
-                    name=url_data['name'],
-                    duration=url_data.get('duration', 30),
-                    max_num=url_data.get('max_num', 3),
-                    is_active=url_data.get('is_active', True)
-                )
-
-                db.session.add(new_url)
-                created_urls.append(url_data['name'])
-            except Exception as e:
-                errors.append(f'URL {i+1}: {str(e)}')
-
-        db.session.commit()
-
-        result = {
-            'message': f'Created {len(created_urls)} URLs',
-            'created': created_urls
+        stats = {
+            'config': config.to_dict(),
+            'total_urls': len(urls),
+            'available_urls': len([url for url in urls if url.can_execute()]),
+            'completed_urls': len([url for url in urls if url.current_count >= url.max_num]),
+            'total_executions': sum(url.current_count for url in urls),
+            'max_possible_executions': sum(url.max_num for url in urls)
         }
 
-        if errors:
-            result['errors'] = errors
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-        return jsonify(result), 201
+@app.route('/api/config/<int:config_id>/reset', methods=['POST'])
+@login_required
+def reset_config_counts(config_id):
+    """重置配置的URL计数"""
+    try:
+        urls = UrlData.query.filter_by(config_id=config_id).all()
+        for url in urls:
+            url.current_count = 0
+            url.last_time = None
+            url.updated_at = datetime.datetime.now()
+
+        db.session.commit()
+        return jsonify({'message': f'Reset {len(urls)} URLs successfully'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/url/<int:url_id>/reset', methods=['POST'])
-def reset_single_url(url_id):
-    """重置单个URL的执行计数"""
+# ==================== 用户管理API ====================
+@app.route('/api/users', methods=['POST'])
+@admin_required
+def api_create_user():
+    """API创建用户 - 需要管理员权限"""
     try:
-        url = UrlData.query.get(url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
 
-        url.current_count = 0
-        url.last_time = None
-        url.updated_at = datetime.datetime.now()
+        # 验证必填字段
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in data or not data[field].strip():
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+
+        username = data['username'].strip()
+        password = data['password']
+        email = data.get('email', '').strip() or None
+        is_admin = data.get('is_admin', False)
+
+        # 验证用户名长度
+        if len(username) < 3 or len(username) > 80:
+            return jsonify({'error': 'Username must be between 3 and 80 characters'}), 400
+
+        # 验证密码强度
+        if len(password) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+
+        # 检查用户名是否已存在
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            return jsonify({'error': f'Username "{username}" already exists'}), 409
+
+        # 检查邮箱是否已存在（如果提供了邮箱）
+        if email:
+            existing_email = User.query.filter_by(email=email).first()
+            if existing_email:
+                return jsonify({'error': f'Email "{email}" already exists'}), 409
+
+        # 创建新用户
+        new_user = User(
+            username=username,
+            password_hash=User.hash_password(password),
+            email=email,
+            is_admin=is_admin,
+            is_active=True
+        )
+
+        db.session.add(new_user)
         db.session.commit()
 
         return jsonify({
-            'message': f'Reset count for {url.name}',
-            'url_data': url.to_dict()
-        })
+            'message': f'User "{username}" created successfully',
+            'user': new_user.to_dict()
+        }), 201
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/users', methods=['GET'])
+@admin_required
+def api_get_users():
+    """获取用户列表 - 需要管理员权限"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        search = request.args.get('search', '', type=str)
+
+        # 限制每页数量
+        per_page = min(per_page, 100)
+
+        query = User.query
+
+        # 搜索功能
+        if search:
+            query = query.filter(
+                User.username.ilike(f'%{search}%') |
+                User.email.ilike(f'%{search}%')
+            )
+
+        # 分页
+        pagination = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+
+        users = pagination.items
+
+        return jsonify({
+            'users': [user.to_dict() for user in users],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'pages': pagination.pages,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['GET'])
+@admin_required
+def api_get_user(user_id):
+    """获取特定用户信息 - 需要管理员权限"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify({
+            'user': user.to_dict()
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['PUT'])
+@admin_required
+def api_update_user(user_id):
+    """更新用户信息 - 需要管理员权限"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # 防止修改当前登录用户的管理员权限
+        current_user_id = session.get('user_id')
+        if user_id == current_user_id and 'is_admin' in data and not data['is_admin']:
+            return jsonify({'error': 'Cannot remove admin privileges from yourself'}), 403
+
+        # 更新用户名
+        if 'username' in data:
+            username = data['username'].strip()
+            if len(username) < 3 or len(username) > 80:
+                return jsonify({'error': 'Username must be between 3 and 80 characters'}), 400
+
+            # 检查用户名是否被其他用户使用
+            existing_user = User.query.filter(User.username == username, User.id != user_id).first()
+            if existing_user:
+                return jsonify({'error': f'Username "{username}" already exists'}), 409
+
+            user.username = username
+
+        # 更新邮箱
+        if 'email' in data:
+            email = data['email'].strip() or None
+            if email:
+                # 检查邮箱是否被其他用户使用
+                existing_email = User.query.filter(User.email == email, User.id != user_id).first()
+                if existing_email:
+                    return jsonify({'error': f'Email "{email}" already exists'}), 409
+
+            user.email = email
+
+        # 更新密码
+        if 'password' in data and data['password']:
+            password = data['password']
+            if len(password) < 6:
+                return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+
+            user.password_hash = User.hash_password(password)
+
+        # 更新管理员状态
+        if 'is_admin' in data:
+            user.is_admin = bool(data['is_admin'])
+
+        # 更新激活状态
+        if 'is_active' in data:
+            # 防止禁用当前登录用户
+            if user_id == current_user_id and not data['is_active']:
+                return jsonify({'error': 'Cannot deactivate yourself'}), 403
+
+            user.is_active = bool(data['is_active'])
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'User "{user.username}" updated successfully',
+            'user': user.to_dict()
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>', methods=['DELETE'])
+@admin_required
+def api_delete_user(user_id):
+    """删除用户 - 需要管理员权限"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # 防止删除当前登录用户
+        current_user_id = session.get('user_id')
+        if user_id == current_user_id:
+            return jsonify({'error': 'Cannot delete yourself'}), 403
+
+        username = user.username
+        db.session.delete(user)
+        db.session.commit()
+
+        return jsonify({
+            'message': f'User "{username}" deleted successfully'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>/toggle-status', methods=['POST'])
+@admin_required
+def api_toggle_user_status(user_id):
+    """切换用户激活状态 - 需要管理员权限"""
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # 防止禁用当前登录用户
+        current_user_id = session.get('user_id')
+        if user_id == current_user_id:
+            return jsonify({'error': 'Cannot change your own status'}), 403
+
+        user.is_active = not user.is_active
+        status = 'activated' if user.is_active else 'deactivated'
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'User "{user.username}" {status} successfully',
+            'user': user.to_dict()
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/profile', methods=['GET'])
+@login_required
+def api_get_profile():
+    """获取当前用户资料"""
+    try:
+        user = db.session.get(User, session['user_id'])
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        return jsonify({
+            'user': user.to_dict()
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/profile', methods=['PUT'])
+@login_required
+def api_update_profile():
+    """更新当前用户资料"""
+    try:
+        user = db.session.get(User, session['user_id'])
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # 更新邮箱
+        if 'email' in data:
+            email = data['email'].strip() or None
+            if email:
+                # 检查邮箱是否被其他用户使用
+                existing_email = User.query.filter(User.email == email, User.id != user.id).first()
+                if existing_email:
+                    return jsonify({'error': f'Email "{email}" already exists'}), 409
+
+            user.email = email
+
+        # 更新密码
+        if 'current_password' in data and 'new_password' in data:
+            current_password = data['current_password']
+            new_password = data['new_password']
+
+            # 验证当前密码
+            if not user.check_password(current_password):
+                return jsonify({'error': 'Current password is incorrect'}), 400
+
+            # 验证新密码
+            if len(new_password) < 6:
+                return jsonify({'error': 'New password must be at least 6 characters long'}), 400
+
+            user.password_hash = User.hash_password(new_password)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Profile updated successfully',
+            'user': user.to_dict()
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# ==================== 管理员路由 ====================
+@app.route('/admin')
+@admin_required
+def admin_panel():
+    """管理员面板"""
+    users = User.query.all()
+    return render_template_string('''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>系统管理</title>
+        <meta charset="UTF-8">
+        <style>
+            body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+            .header { background: #dc3545; color: white; padding: 1rem 2rem; margin: -20px -20px 20px; display: flex; justify-content: space-between; align-items: center; }
+            .container { max-width: 1000px; margin: 0 auto; }
+            .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+            .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0.25rem; }
+            .btn-primary { background: #007bff; color: white; }
+            .btn-success { background: #28a745; color: white; }
+            .btn-danger { background: #dc3545; color: white; }
+            table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+            th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background: #f8f9fa; }
+            .form-group { margin-bottom: 1rem; }
+            label { display: block; margin-bottom: 0.5rem; color: #555; }
+            input, select { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>系统管理</h1>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">返回仪表板</a>
+        </div>
+        
+        <div class="container">
+            <div class="card">
+                <h2>创建用户</h2>
+                <form method="POST" action="{{ url_for('create_user') }}">
+                    <div class="form-group">
+                        <label>用户名:</label>
+                        <input type="text" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label>密码:</label>
+                        <input type="password" name="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>邮箱:</label>
+                        <input type="email" name="email">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" name="is_admin"> 管理员权限
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-success">创建用户</button>
+                </form>
+            </div>
+            
+            <div class="card">
+                <h2>用户管理</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户名</th>
+                            <th>邮箱</th>
+                            <th>管理员</th>
+                            <th>状态</th>
+                            <th>最后登录</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email or '-' }}</td>
+                            <td>{{ '是' if user.is_admin else '否' }}</td>
+                            <td>{{ '激活' if user.is_active else '禁用' }}</td>
+                            <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '从未' }}</td>
+                            <td>
+                                {% if user.id != session.user_id %}
+                                    <a href="{{ url_for('toggle_user_status', user_id=user.id) }}" 
+                                       class="btn btn-warning">
+                                       {{ '禁用' if user.is_active else '激活' }}
+                                    </a>
+                                    <a href="{{ url_for('delete_user', user_id=user.id) }}" 
+                                       class="btn btn-danger"
+                                       onclick="return confirm('确定删除用户 {{ user.username }} 吗？')">
+                                       删除
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </body>
+    </html>
+    ''', users=users, session=session)
+
+@app.route('/admin/create-user', methods=['POST'])
+@admin_required
+def create_user():
+    """创建新用户"""
+    try:
+        username = request.form['username']
+        password = request.form['password']
+        email = request.form.get('email')
+        is_admin = 'is_admin' in request.form
+
+        # 检查用户名是否已存在
+        if User.query.filter_by(username=username).first():
+            flash('用户名已存在')
+            return redirect(url_for('admin_panel'))
+
+        user = User(
+            username=username,
+            password_hash=User.hash_password(password),
+            email=email,
+            is_admin=is_admin
+        )
+
+        db.session.add(user)
+        db.session.commit()
+
+        flash(f'用户 {username} 创建成功')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'创建用户失败: {str(e)}')
+
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/toggle-user/<int:user_id>')
+@admin_required
+def toggle_user_status(user_id):
+    """切换用户状态"""
+    try:
+        user = db.session.get(User, user_id)
+        if user and user.id != session['user_id']:
+            user.is_active = not user.is_active
+            db.session.commit()
+            flash(f'用户 {user.username} 已{"激活" if user.is_active else "禁用"}')
+        else:
+            flash('无法操作当前用户')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'操作失败: {str(e)}')
+
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete-user/<int:user_id>')
+@admin_required
+def delete_user(user_id):
+    """删除用户"""
+    try:
+        user = db.session.get(User, user_id)
+        if user and user.id != session['user_id']:
+            username = user.username
+            db.session.delete(user)
+            db.session.commit()
+            flash(f'用户 {username} 已删除')
+        else:
+            flash('无法删除当前用户')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'删除失败: {str(e)}')
+
+    return redirect(url_for('admin_panel'))
+
+# ==================== 初始化函数 ====================
+def init_database():
+    """初始化数据库和默认用户"""
+    try:
+        db.create_all()
+
+        # 创建默认管理员用户
+        admin_user = User.query.filter_by(username='admin').first()
+        if not admin_user:
+            admin_user = User(
+                username='admin',
+                password_hash=User.hash_password('admin123'),
+                email='admin@example.com',
+                is_admin=True
+            )
+            db.session.add(admin_user)
+            print("创建默认管理员用户: admin / admin123")
+
+        # 创建默认配置
+        config = ConfigData.query.first()
+        if not config:
+            config = ConfigData(
+                success_time_min=5,
+                success_time_max=10,
+                reset_time=0,
+                description='默认配置数据'
+            )
+            db.session.add(config)
+            db.session.flush()
+
+        # 创建示例URL数据
+        if UrlData.query.count() == 0:
+            telegram_urls = [
+                {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
+                {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
+                {'url': 'https://t.me/lianheshequ424', 'name': '联合社区', 'duration': 30, 'max_num': 3},
+                {'url': 'https://t.me/make_friends1', 'name': 'make_friends', 'duration': 30, 'max_num': 3}
+            ]
+
+            for url_data in telegram_urls:
+                url = UrlData(
+                    config_id=config.id,
+                    **url_data
+                )
+                db.session.add(url)
+
+        db.session.commit()
+        print("数据库初始化完成!")
+        return True
+
+    except Exception as e:
+        print(f"初始化数据库时出错: {e}")
+        db.session.rollback()
+        return False
+
 if __name__ == '__main__':
     with app.app_context():
-        try:
-            # 创建表（如果不存在）
-            db.create_all()
-            print("数据库表创建成功!")
-
-            # 初始化示例数据
-            init_sample_data()
-
-            # 测试配置数据获取
-            config_data = get_config_json()
-            print("配置数据获取成功:", config_data)
-
-            print("\n可用API端点:")
-            print("=== 基础配置API ===")
-            print("- GET / - API文档和状态")
-            print("- GET /api/config - 获取配置数据")
-            print("- GET /api/config/full - 获取完整配置（视图）")
-            print("- GET /api/config/{id} - 获取特定配置")
-            print("- POST /api/config - 创建新配置")
-            print("- POST /api/url/{id}/execute - 执行特定URL")
-            print("- POST /api/config/{id}/reset - 重置计数")
-            print("- PUT /api/config/{id}/extra - 更新额外配置")
-            print("- GET /api/configs/search - 搜索配置")
-            print("- GET /api/config/{id}/telegram - 获取Telegram频道")
-            print("- GET /api/urls/available - 获取可执行的URL")
-            print("- GET /api/config/{id}/status - 获取状态统计")
-            print("\n=== URL数据管理API ===")
-            print("- POST /api/url - 创建新URL")
-            print("- GET /api/url/{id} - 获取URL详情")
-            print("- PUT /api/url/{id} - 更新URL")
-            print("- DELETE /api/url/{id} - 删除URL（软删除）")
-            print("- POST /api/url/{id}/reset - 重置单个URL计数")
-            print("- GET /api/config/{id}/urls - 获取配置的所有URL")
-            print("- POST /api/config/{id}/urls/batch - 批量创建URL")
-
-        except Exception as e:
-            print(f"初始化时出错: {e}")
-
-    app.run(debug=True, host='0.0.0.0', port=5000)
+        if init_database():
+            print("📍 访问地址: http://localhost:5000")
+        app.run(debug=True, host='0.0.0.0', port=5000)
