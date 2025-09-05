@@ -12,12 +12,18 @@ from app.auth.decorators import login_required, token_required
 def get_config():
     """获取配置数据"""
     pade_code = request.args.get('pade_code')
-    print(pade_code)
     config_id = request.args.get('config_id', type=int)
     if config_id:
         config = db.session.get(ConfigData, config_id)
         if not config:
             return jsonify({'error': 'Config not found'}), 404
+        if pade_code:
+            try:
+                config.pade_code = pade_code
+                db.session.commit()
+            except Exception as e:
+                print(f"Error saving pade_code: {e}")
+                db.session.rollback()
         return jsonify(config.to_dict()), 200
     else:
         config = ConfigData.query.filter_by(is_active=True).first()
