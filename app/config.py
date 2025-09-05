@@ -10,4 +10,4 @@ class Config:
                    'postgresql://postgres:1332@localhost:5432/postgres'
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    PKG_NAME = 'flask-message-manager'
+    PKG_NAME = 'com.a8jbctzav.cj02cuuma'

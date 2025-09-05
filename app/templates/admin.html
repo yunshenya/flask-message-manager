@@ -118,39 +118,6 @@
     <!-- 机器管理标签页 -->
     <div id="machines-tab" class="tab-content">
         <div class="card">
-            <h2>添加新机器</h2>
-            <form onsubmit="addMachine(event)">
-                <div class="form-group">
-                    <label>机器名称:</label>
-                    <input type="text" id="newMachineName" required placeholder="例如: 主要服务器">
-                </div>
-                <div class="form-group">
-                    <label>机器代码:</label>
-                    <input type="text" id="newMachineCode" required placeholder="例如: AC32010960163">
-                </div>
-                <div class="form-group">
-                    <label>描述 (可选):</label>
-                    <input type="text" id="newMachineDesc" placeholder="机器用途描述">
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group">
-                        <label>成功时间范围 (秒) - 最小值:</label>
-                        <input type="number" id="newSuccessTimeMin" value="5" min="1">
-                    </div>
-                    <div class="form-group">
-                        <label>成功时间范围 (秒) - 最大值:</label>
-                        <input type="number" id="newSuccessTimeMax" value="10" min="1">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>重置时间 (小时):</label>
-                    <input type="number" id="newResetTime" value="0" min="0">
-                </div>
-                <button type="submit" class="btn btn-success">添加机器</button>
-            </form>
-        </div>
-
-        <div class="card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>机器列表</h2>
                 <div>
@@ -232,78 +199,51 @@
         }
 
         const tableHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>名称</th>
-                        <th>代码</th>
-                        <th>描述</th>
-                        <th>状态</th>
-                        <th>时间配置</th>
-                        <th>创建时间</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${machines.map(machine => `
+            <div style="overflow-x: auto;">
+                <table style="min-width: 1000px;">
+                    <thead>
                         <tr>
-                            <td>${machine.id}</td>
-                            <td>${machine.name}</td>
-                            <td>${machine.pade_code}</td>
-                            <td>${machine.description || '-'}</td>
-                            <td>
-                                <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
-                                    ${machine.is_active ? '激活' : '禁用'}
-                                </span>
-                            </td>
-                            <td>${machine.success_time[0]}-${machine.success_time[1]}秒</td>
-                            <td>${new Date(machine.created_at).toLocaleString()}</td>
-                            <td>
-                                <button class="btn btn-warning" onclick="toggleMachine(${machine.id})">
-                                    ${machine.is_active ? '禁用' : '激活'}
-                                </button>
-                                <button class="btn btn-info" onclick="editMachine(${machine.id})">编辑</button>
-                                <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${machine.message}')">删除</button>
-                            </td>
+                            <th style="width: 60px;">ID</th>
+                            <th style="width: 120px;">名称</th>
+                            <th style="width: 150px;">消息</th>
+                            <th style="width: 150px;">代码</th>
+                            <th style="width: 200px;">描述</th>
+                            <th style="width: 80px;">状态</th>
+                            <th style="width: 100px;">时间配置</th>
+                            <th style="width: 140px;">创建时间</th>
+                            <th style="width: 200px;">操作</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        ${machines.map(machine => `
+                            <tr>
+                                <td style="width: 60px;">${machine.id}</td>
+                                <td style="width: 120px; word-wrap: break-word;">${machine.name || '-'}</td>
+                                <td style="width: 150px; word-wrap: break-word;">${machine.message || '-'}</td>
+                                <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${machine.pade_code}</td>
+                                <td style="width: 200px; word-wrap: break-word;">${machine.description || '-'}</td>
+                                <td style="width: 80px;">
+                                    <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
+                                        ${machine.is_active ? '激活' : '禁用'}
+                                    </span>
+                                </td>
+                                <td style="width: 100px;">${machine.success_time[0]}-${machine.success_time[1]}秒</td>
+                                <td style="width: 140px; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
+                                <td style="width: 200px;">
+                                    <button class="btn btn-info" onclick="editMachine(${machine.id})" style="margin: 2px;">编辑</button>
+                                    <button class="btn btn-warning" onclick="toggleMachine(${machine.id})" style="margin: 2px;">
+                                        ${machine.is_active ? '禁用' : '激活'}
+                                    </button>
+                                    <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${machine.name || machine.message}')" style="margin: 2px;">删除</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
 
         tableDiv.innerHTML = tableHTML;
-    }
-
-    // 添加新机器
-    async function addMachine(event) {
-        event.preventDefault();
-
-        const data = {
-            message: document.getElementById('newMachineName').value,
-            pade_code: document.getElementById('newMachineCode').value,
-            description: document.getElementById('newMachineDesc').value,
-            success_time_min: parseInt(document.getElementById('newSuccessTimeMin').value),
-            success_time_max: parseInt(document.getElementById('newSuccessTimeMax').value),
-            reset_time: parseInt(document.getElementById('newResetTime').value)
-        };
-
-        try {
-            const result = await apiCall('/api/machines', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
-
-            alert('机器添加成功!');
-            document.querySelector('#machines-tab form').reset();
-            // 重置为默认值
-            document.getElementById('newSuccessTimeMin').value = 5;
-            document.getElementById('newSuccessTimeMax').value = 10;
-            document.getElementById('newResetTime').value = 0;
-            await loadMachines();
-        } catch (error) {
-            // 错误已在apiCall中处理
-        }
     }
 
     // 切换机器状态
@@ -320,18 +260,38 @@
         }
     }
 
-    // 编辑机器 (简化版，可以扩展为完整的编辑表单)
-    async function editMachine(machineId) {
-        const newName = prompt('请输入新的机器名称:');
-        if (!newName || !newName.trim()) return;
 
+    async function editMachine(machineId) {
         try {
+            // 获取机器信息
+            const response = await apiCall(`/api/machines/${machineId}`);
+            const machine = response.machine;
+
+            const newName = prompt('机器名称:', machine.name || '');
+            if (newName === null) return; // 用户取消
+
+            const newMessage = prompt('发送消息:', machine.message || '');
+            if (newMessage === null) return;
+
+            const newCode = prompt('机器代码:', machine.pade_code || '');
+            if (newCode === null) return;
+
+            const newDesc = prompt('描述 (可选):', machine.description || '');
+            if (newDesc === null) return;
+
+            const data = {
+                name: newName.trim() || machine.name,
+                message: newMessage.trim() || machine.message,
+                pade_code: newCode.trim() || machine.pade_code,
+                description: newDesc.trim() || machine.description
+            };
+
             const result = await apiCall(`/api/machines/${machineId}`, {
                 method: 'PUT',
-                body: JSON.stringify({ message: newName.trim() })
+                body: JSON.stringify(data)
             });
 
-            alert('机器名称更新成功!');
+            alert('机器更新成功!');
             await loadMachines();
         } catch (error) {
             // 错误已在apiCall中处理

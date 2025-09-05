@@ -16,6 +16,7 @@ def get_config():
         return jsonify({
             'success_time': [config.success_time_min, config.success_time_max],
             'reset_time': config.reset_time,
+            'message': config.message,
             'urldata': [url.to_dict() for url in config.urls if url.is_active]
         })
     return jsonify({'error': 'Config not found'}), 404

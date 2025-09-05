@@ -36,6 +36,9 @@
             <button class="btn btn-info btn-sm" onclick="refreshMachineList()">
                 <span id="refreshIcon">🔄</span> 刷新
             </button>
+            <button class="btn btn-warning btn-sm" onclick="editCurrentMachine()" id="editCurrentBtn" style="display: none;">
+                ✏️ 编辑当前机器
+            </button>
         </div>
         <div class="machine-info" id="currentMachineInfo" style="display: none;">
             <div>
@@ -162,36 +165,71 @@
 <div id="machineManagementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow-y: auto;">
         <h3>机器管理</h3>
-        <div style="margin-bottom: 2rem;">
-            <h4>添加新机器</h4>
-            <form onsubmit="addMachine(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: end;">
-                <div>
-                    <label>机器名称:</label>
-                    <input type="text" id="newMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                <div>
-                    <label>发送的消息:</label>
-                    <input type="text" id="newMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                <div>
-                    <label>机器代码:</label>
-                    <input type="text" id="newMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                <div>
-                    <label>描述:</label>
-                    <input type="text" id="newMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                </div>
-                <div>
-                    <button type="submit" class="btn btn-success">添加机器</button>
-                </div>
-            </form>
-        </div>
         <div id="machineList">
             <!-- 机器列表将动态加载 -->
         </div>
         <div style="text-align: right; margin-top: 2rem;">
             <button onclick="hideMachineManagement()" class="btn btn-danger">关闭</button>
         </div>
+    </div>
+</div>
+
+<!-- 编辑机器模态框 -->
+<div id="editMachineModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <h3>编辑机器配置</h3>
+        <form onsubmit="saveEditedMachine(event)">
+            <input type="hidden" id="editMachineId">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label>机器名称:</label>
+                    <input type="text" id="editMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>发送的消息:</label>
+                    <input type="text" id="editMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label>机器代码:</label>
+                    <input type="text" id="editMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>描述:</label>
+                    <input type="text" id="editMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label>成功时间范围 (秒) - 最小值:</label>
+                    <input type="number" id="editSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>成功时间范围 (秒) - 最大值:</label>
+                    <input type="number" id="editSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label>重置时间 (小时):</label>
+                <input type="number" id="editResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="editIsActive"> 激活状态
+                </label>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem;">
+                <button type="button" onclick="hideEditMachineModal()" class="btn btn-secondary" style="margin-right: 1rem;">取消</button>
+                <button type="submit" class="btn btn-success">保存更改</button>
+            </div>
+        </form>
     </div>
 </div>
 

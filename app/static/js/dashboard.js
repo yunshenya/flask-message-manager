@@ -29,6 +29,7 @@ async function apiCall(url, options = {}) {
 
 // 全局变量
 let currentEditingUrlId = null;
+let currentEditingMachineId = null;
 let currentConfigId = null;
 let currentConfigData = null;
 let systemRunningMap = new Map();
@@ -55,7 +56,7 @@ async function loadMachineList() {
         machines.forEach(machine => {
             const option = document.createElement('option');
             option.value = machine.id;
-            option.textContent = `${machine.pade_code}`;
+            option.textContent = `${machine.name}(${machine.pade_code})`;
             select.appendChild(option);
         });
 
@@ -218,7 +219,7 @@ function getStatusButton(url, isSystemRunning) {
 
 function updatePageTitle() {
     const time = new Date(lastUpdateTime).toLocaleTimeString();
-    const machineName = currentConfigData ? currentConfigData.pade_code : '未选择';
+    const machineName = currentConfigData ? (currentConfigData.name || currentConfigData.pade_code) : '未选择';
     document.title = `消息管理系统 - ${machineName} (${time})`;
 }
 
@@ -285,7 +286,9 @@ async function saveEditedUrl(event) {
     }
 }
 
-
+// ================================
+// URL添加功能
+// ================================
 function showAddUrlModal() {
     if (!currentConfigId) {
         alert('请先选择一台机器');
@@ -329,7 +332,9 @@ async function addUrl(event) {
     }
 }
 
-
+// ================================
+// URL删除功能
+// ================================
 async function deleteUrl(urlId, urlName) {
     if (!confirm(`确定要删除URL "${urlName}" 吗？此操作不可撤销。`)) {
         return;
@@ -463,7 +468,7 @@ async function startAllMachines() {
             });
             successCount++;
         } catch (error) {
-            console.error(`启动机器 ${machine.pade_code} 失败:`, error);
+            console.error(`启动机器 ${machine.name || machine.pade_code} 失败:`, error);
             failCount++;
         }
     }
@@ -493,7 +498,7 @@ async function stopAllMachines() {
             });
             successCount++;
         } catch (error) {
-            console.error(`停止机器 ${machine.pade_code} 失败:`, error);
+            console.error(`停止机器 ${machine.name || machine.pade_code} 失败:`, error);
             failCount++;
         }
     }
@@ -515,6 +520,91 @@ function hideMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'none';
 }
 
+// 显示编辑机器模态框
+function showEditMachineModal() {
+    document.getElementById('editMachineModal').style.display = 'block';
+}
+
+// 隐藏编辑机器模态框
+function hideEditMachineModal() {
+    document.getElementById('editMachineModal').style.display = 'none';
+    currentEditingMachineId = null;
+}
+
+// 编辑机器
+async function editMachine(machineId) {
+    try {
+        // 获取机器信息
+        const response = await apiCall(`/api/machines/${machineId}`);
+        const machine = response.machine;
+
+        currentEditingMachineId = machineId;
+
+        // 填充编辑表单
+        document.getElementById('editMachineId').value = machine.id;
+        document.getElementById('editMachineName').value = machine.name || '';
+        document.getElementById('editMachineMessage').value = machine.message || '';
+        document.getElementById('editMachineCode').value = machine.pade_code || '';
+        document.getElementById('editMachineDesc').value = machine.description || '';
+        document.getElementById('editSuccessTimeMin').value = machine.success_time[0];
+        document.getElementById('editSuccessTimeMax').value = machine.success_time[1];
+        document.getElementById('editResetTime').value = machine.reset_time;
+        document.getElementById('editIsActive').checked = machine.is_active;
+
+        showEditMachineModal();
+    } catch (error) {
+        console.error('获取机器信息失败:', error);
+        alert('获取机器信息失败');
+    }
+}
+
+// 保存编辑的机器
+async function saveEditedMachine(event) {
+    event.preventDefault();
+
+    if (!currentEditingMachineId) {
+        alert('无效的编辑操作');
+        return;
+    }
+
+    const data = {
+        name: document.getElementById('editMachineName').value,
+        message: document.getElementById('editMachineMessage').value,
+        pade_code: document.getElementById('editMachineCode').value,
+        description: document.getElementById('editMachineDesc').value,
+        success_time_min: parseInt(document.getElementById('editSuccessTimeMin').value),
+        success_time_max: parseInt(document.getElementById('editSuccessTimeMax').value),
+        reset_time: parseInt(document.getElementById('editResetTime').value),
+        is_active: document.getElementById('editIsActive').checked
+    };
+
+    try {
+        const result = await apiCall(`/api/machines/${currentEditingMachineId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data)
+        });
+
+        alert('机器更新成功!');
+        hideEditMachineModal();
+        await loadMachineManagementList();
+        await loadMachineList();
+        updateCurrentMachineInfo();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+// 编辑当前选中的机器
+async function editCurrentMachine() {
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
+
+    // 直接调用编辑机器功能
+    await editMachine(currentConfigId);
+}
+
 async function loadMachineManagementList() {
     try {
         const machines = await apiCall('/api/machines');
@@ -531,6 +621,7 @@ async function loadMachineManagementList() {
                     <tr style="background: #f8f9fa;">
                         <th style="padding: 0.5rem; border: 1px solid #ddd;">ID</th>
                         <th style="padding: 0.5rem; border: 1px solid #ddd;">名称</th>
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">消息</th>
                         <th style="padding: 0.5rem; border: 1px solid #ddd;">代码</th>
                         <th style="padding: 0.5rem; border: 1px solid #ddd;">状态</th>
                         <th style="padding: 0.5rem; border: 1px solid #ddd;">操作</th>
@@ -540,7 +631,8 @@ async function loadMachineManagementList() {
                     ${machines.map(machine => `
                         <tr>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.message || '-'}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
                                 <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
@@ -548,10 +640,11 @@ async function loadMachineManagementList() {
                                 </span>
                             </td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                                <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id})">编辑</button>
                                 <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
                                     ${machine.is_active ? '禁用' : '激活'}
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.pade_code}')">删除</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.name || machine.pade_code}')">删除</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -560,31 +653,6 @@ async function loadMachineManagementList() {
         `;
     } catch (error) {
         console.error('加载机器管理列表失败:', error);
-    }
-}
-
-async function addMachine(event) {
-    event.preventDefault();
-
-    const data = {
-        name:  document.getElementById('newMachineName').value,
-        message : document.getElementById('newMachineMessage').value,
-        pade_code: document.getElementById('newMachineCode').value,
-        description: document.getElementById('newMachineDesc').value
-    };
-
-    try {
-        const result = await apiCall('/api/machines', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-
-        alert('机器添加成功!');
-        document.querySelector('#machineManagementModal form').reset();
-        await loadMachineManagementList();
-        await loadMachineList();
-    } catch (error) {
-        // 错误已在apiCall中处理
     }
 }
 
@@ -670,9 +738,6 @@ function refreshData() {
     });
 }
 
-// ================================
-// 页面初始化
-// ================================
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始加载机器列表
     await loadMachineList();
