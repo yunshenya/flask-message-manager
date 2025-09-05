@@ -540,7 +540,7 @@ async function loadMachineManagementList() {
                     ${machines.map(machine => `
                         <tr>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
                                 <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">

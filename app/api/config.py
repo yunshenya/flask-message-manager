@@ -10,7 +10,7 @@ from app.auth.decorators import login_required, token_required
 @bp.route('/config', methods=['GET'])
 @token_required
 def get_config():
-    pade_code = request.json.get('pade_code')
+    pade_code = request.args.get('pade_code')
     config = ConfigData.query.filter_by(pade_code=pade_code).first()
     if config:
         return jsonify({

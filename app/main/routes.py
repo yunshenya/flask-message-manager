@@ -18,4 +18,4 @@ def dashboard():
 
 @bp.route("/favicon.ico", methods=['GET', 'POST'])
 def favicon():
-    return url_for('static/img', filename='favicon.ico')
+    return url_for('static', filename='img/favicon.ico')
