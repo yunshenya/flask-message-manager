@@ -103,6 +103,8 @@ def update_machine(machine_id):
             machine.success_time_max = data['success_time_max']
         if 'reset_time' in data:
             machine.reset_time = data['reset_time']
+        if 'name' in data:
+            machine.name = data['name']
         if 'is_active' in data:
             machine.is_active = data['is_active']
 

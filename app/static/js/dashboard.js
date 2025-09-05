@@ -1,3 +1,15 @@
+// 显示消息详情
+function showMessageDetail(message, machineName) {
+    document.getElementById('messageDetailTitle').textContent = `${machineName} - 消息详情`;
+    document.getElementById('messageDetailContent').textContent = message;
+    document.getElementById('messageDetailModal').style.display = 'block';
+}
+
+// 隐藏消息详情
+function hideMessageDetail() {
+    document.getElementById('messageDetailModal').style.display = 'none';
+}
+
 // 多机器仪表板管理系统
 const API_BASE = '';
 
@@ -56,7 +68,10 @@ async function loadMachineList() {
         machines.forEach(machine => {
             const option = document.createElement('option');
             option.value = machine.id;
-            option.textContent = `${machine.name}(${machine.pade_code})`;
+            // 显示格式：机器名称 + pade_code
+            const machineName = machine.name || '未命名';
+            const machineCode = machine.pade_code || '无代码';
+            option.textContent = `${machineName} (${machineCode})`;
             select.appendChild(option);
         });
 
@@ -102,9 +117,11 @@ function updateCurrentMachineInfo() {
     const infoDiv = document.getElementById('currentMachineInfo');
     const statusSpan = document.getElementById('currentMachineStatus');
     const codeSpan = document.getElementById('currentMachineCode');
+    const editBtn = document.getElementById('editCurrentBtn');
 
     if (!currentConfigId || !availableMachines.length) {
         infoDiv.style.display = 'none';
+        editBtn.style.display = 'none';
         return;
     }
 
@@ -114,8 +131,10 @@ function updateCurrentMachineInfo() {
         statusSpan.textContent = machine.is_active ? '激活' : '禁用';
         statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
         infoDiv.style.display = 'flex';
+        editBtn.style.display = 'inline-block';
     } else {
         infoDiv.style.display = 'none';
+        editBtn.style.display = 'none';
     }
 }
 
@@ -628,11 +647,18 @@ async function loadMachineManagementList() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${machines.map(machine => `
+                    ${machines.map(machine => {
+            const message = machine.message || '-';
+            const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
+            return `
                         <tr>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.message || '-'}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                                <span style="cursor: pointer; color: #007bff; text-decoration: underline;" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
+                                    ${displayMessage}
+                                </span>
+                            </td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
                                 <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
@@ -644,10 +670,10 @@ async function loadMachineManagementList() {
                                 <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
                                     ${machine.is_active ? '禁用' : '激活'}
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.name || machine.pade_code}')">删除</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.pade_code).replace(/'/g, '&#39;')}')">删除</button>
                             </td>
                         </tr>
-                    `).join('')}
+                    `}).join('')}
                 </tbody>
             </table>
         `;
@@ -738,6 +764,9 @@ function refreshData() {
     });
 }
 
+// ================================
+// 页面初始化
+// ================================
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始加载机器列表
     await loadMachineList();

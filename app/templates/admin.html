@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
     <title>系统管理</title>
     <meta charset="UTF-8">
@@ -29,6 +29,8 @@
         .machine-status { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
         .status-active { background: #d4edda; color: #155724; }
         .status-inactive { background: #f8d7da; color: #721c24; }
+        .message-link { cursor: pointer; color: #007bff; text-decoration: underline; }
+        .message-link:hover { color: #0056b3; }
     </style>
 </head>
 <body>
@@ -133,7 +135,139 @@
     </div>
 </div>
 
+<!-- 消息详情模态框 -->
+<div id="messageDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
+        <h3 id="messageDetailTitle">消息详情</h3>
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0; max-height: 300px; overflow-y: auto;">
+            <p id="messageDetailContent" style="white-space: pre-wrap; margin: 0; line-height: 1.5;"></p>
+        </div>
+        <div style="text-align: right;">
+            <button onclick="hideMessageDetail()" class="btn btn-secondary">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑机器模态框 -->
+<div id="editMachineModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <h3>编辑机器配置</h3>
+        <form onsubmit="saveEditedMachine(event)">
+            <input type="hidden" id="editMachineId">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>机器名称:</label>
+                    <input type="text" id="editMachineName" required>
+                </div>
+                <div class="form-group">
+                    <label>发送的消息:</label>
+                    <input type="text" id="editMachineMessage" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>机器代码:</label>
+                    <input type="text" id="editMachineCode" required>
+                </div>
+                <div class="form-group">
+                    <label>描述:</label>
+                    <input type="text" id="editMachineDesc">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>成功时间范围 (秒) - 最小值:</label>
+                    <input type="number" id="editSuccessTimeMin" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>成功时间范围 (秒) - 最大值:</label>
+                    <input type="number" id="editSuccessTimeMax" min="1" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>重置时间 (小时):</label>
+                <input type="number" id="editResetTime" min="0">
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="editIsActive"> 激活状态
+                </label>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+                <button type="button" onclick="hideEditMachineModal()" class="btn btn-secondary" style="margin-right: 1rem;">取消</button>
+                <button type="submit" class="btn btn-success">保存更改</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
+    // 显示消息详情
+    function showMessageDetail(message, machineName) {
+        document.getElementById('messageDetailTitle').textContent = `${machineName} - 消息详情`;
+        document.getElementById('messageDetailContent').textContent = message;
+        document.getElementById('messageDetailModal').style.display = 'block';
+    }
+
+    // 隐藏消息详情
+    function hideMessageDetail() {
+        document.getElementById('messageDetailModal').style.display = 'none';
+    }
+
+    // 全局变量
+    let currentEditingMachineId = null;
+
+    // 显示编辑机器模态框
+    function showEditMachineModal() {
+        document.getElementById('editMachineModal').style.display = 'block';
+    }
+
+    // 隐藏编辑机器模态框
+    function hideEditMachineModal() {
+        document.getElementById('editMachineModal').style.display = 'none';
+        currentEditingMachineId = null;
+    }
+
+    // 保存编辑的机器
+    async function saveEditedMachine(event) {
+        event.preventDefault();
+
+        if (!currentEditingMachineId) {
+            alert('无效的编辑操作');
+            return;
+        }
+
+        const data = {
+            name: document.getElementById('editMachineName').value,
+            message: document.getElementById('editMachineMessage').value,
+            pade_code: document.getElementById('editMachineCode').value,
+            description: document.getElementById('editMachineDesc').value,
+            success_time_min: parseInt(document.getElementById('editSuccessTimeMin').value),
+            success_time_max: parseInt(document.getElementById('editSuccessTimeMax').value),
+            reset_time: parseInt(document.getElementById('editResetTime').value),
+            is_active: document.getElementById('editIsActive').checked
+        };
+
+        try {
+            const result = await apiCall(`/api/machines/${currentEditingMachineId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+
+            alert('机器更新成功!');
+            hideEditMachineModal();
+            await loadMachines();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
     // 标签页切换功能
     function switchTab(tabName) {
         // 隐藏所有标签页内容
@@ -215,11 +349,18 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${machines.map(machine => `
+                        ${machines.map(machine => {
+            const message = machine.message || '-';
+            const displayMessage = message.length > 5 ? message.substring(0, 5) + '...' : message;
+            return `
                             <tr>
                                 <td style="width: 60px;">${machine.id}</td>
                                 <td style="width: 120px; word-wrap: break-word;">${machine.name || '-'}</td>
-                                <td style="width: 150px; word-wrap: break-word;">${machine.message || '-'}</td>
+                                <td style="width: 150px;">
+                                    <span class="message-link" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
+                                        ${displayMessage}
+                                    </span>
+                                </td>
                                 <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${machine.pade_code}</td>
                                 <td style="width: 200px; word-wrap: break-word;">${machine.description || '-'}</td>
                                 <td style="width: 80px;">
@@ -234,10 +375,10 @@
                                     <button class="btn btn-warning" onclick="toggleMachine(${machine.id})" style="margin: 2px;">
                                         ${machine.is_active ? '禁用' : '激活'}
                                     </button>
-                                    <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${machine.name || machine.message}')" style="margin: 2px;">删除</button>
+                                    <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
             </div>
@@ -260,41 +401,29 @@
         }
     }
 
-
     async function editMachine(machineId) {
         try {
             // 获取机器信息
             const response = await apiCall(`/api/machines/${machineId}`);
             const machine = response.machine;
 
-            const newName = prompt('机器名称:', machine.name || '');
-            if (newName === null) return; // 用户取消
+            currentEditingMachineId = machineId;
 
-            const newMessage = prompt('发送消息:', machine.message || '');
-            if (newMessage === null) return;
+            // 填充编辑表单
+            document.getElementById('editMachineId').value = machine.id;
+            document.getElementById('editMachineName').value = machine.name || '';
+            document.getElementById('editMachineMessage').value = machine.message || '';
+            document.getElementById('editMachineCode').value = machine.pade_code || '';
+            document.getElementById('editMachineDesc').value = machine.description || '';
+            document.getElementById('editSuccessTimeMin').value = machine.success_time[0];
+            document.getElementById('editSuccessTimeMax').value = machine.success_time[1];
+            document.getElementById('editResetTime').value = machine.reset_time;
+            document.getElementById('editIsActive').checked = machine.is_active;
 
-            const newCode = prompt('机器代码:', machine.pade_code || '');
-            if (newCode === null) return;
-
-            const newDesc = prompt('描述 (可选):', machine.description || '');
-            if (newDesc === null) return;
-
-            const data = {
-                name: newName.trim() || machine.name,
-                message: newMessage.trim() || machine.message,
-                pade_code: newCode.trim() || machine.pade_code,
-                description: newDesc.trim() || machine.description
-            };
-
-            const result = await apiCall(`/api/machines/${machineId}`, {
-                method: 'PUT',
-                body: JSON.stringify(data)
-            });
-
-            alert('机器更新成功!');
-            await loadMachines();
+            showEditMachineModal();
         } catch (error) {
-            // 错误已在apiCall中处理
+            console.error('获取机器信息失败:', error);
+            alert('获取机器信息失败');
         }
     }
 
