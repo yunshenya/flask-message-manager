@@ -11,4 +11,4 @@ class Config:
     SQLALCHEMY_DATABASE_URI = DATABASE_URL
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     PKG_NAME = 'com.a8jbctzav.cj02cuuma'
-    TG_PKG_NAME = 'org.telegram.messenger'
+    TG_PKG_NAME = 'org.telegram.messenger.web'
