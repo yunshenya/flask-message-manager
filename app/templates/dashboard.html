@@ -5,6 +5,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../static/css/styles.css">
+    <style>
+        .url-item-labeled {
+            border-left: 3px solid #17a2b8;
+            background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%);
+        }
+
+        .url-label-badge {
+            background: #17a2b8 !important;
+            color: white !important;
+            padding: 0.1rem 0.3rem !important;
+            border-radius: 3px !important;
+            font-size: 0.75rem !important;
+            margin-left: 0.5rem !important;
+            font-weight: bold;
+        }
+
+        .label-stat-card {
+            transition: transform 0.2s ease;
+        }
+
+        .label-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
 </head>
 <body>
 <div class="header">
@@ -92,6 +132,20 @@
         {% endif %}
     </div>
 
+    <!-- 筛选信息显示 -->
+    <div id="filterInfo"></div>
+
+    <!-- 标签统计区域 -->
+    <div class="card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; color: #333;">🏷️ 标签统计</h3>
+            <button class="btn btn-info btn-sm" onclick="loadLabelStats()">刷新标签统计</button>
+        </div>
+        <div id="labelStats">
+            <p style="color: #666; text-align: center;">加载中...</p>
+        </div>
+    </div>
+
     <div class="url-list" id="urlList">
         <!-- URL列表将通过JavaScript动态加载 -->
     </div>
@@ -124,12 +178,19 @@
                 <input type="text" id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
             </div>
             <div style="margin-bottom: 1rem;">
-                <label>持续时间(秒):</label>
-                <input type="number" id="newDuration" value="30" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <label>标签:</label>
+                <input type="text" value="(由系统自动设置)" readonly style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
+                <small style="color: #6c757d;">标签将在URL执行后由后端系统自动设置</small>
             </div>
-            <div style="margin-bottom: 1rem;">
-                <label>最大执行次数:</label>
-                <input type="number" id="newMaxNum" value="3" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label>持续时间(秒):</label>
+                    <input type="number" id="newDuration" value="30" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>最大执行次数:</label>
+                    <input type="number" id="newMaxNum" value="3" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
             </div>
             <div style="text-align: right;">
                 <button type="button" onclick="hideAddUrlModal()" class="btn btn-danger">取消</button>
@@ -154,12 +215,18 @@
                 <input type="text" id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
             </div>
             <div style="margin-bottom: 1rem;">
-                <label>持续时间(秒):</label>
-                <input type="number" id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <label>标签 (只读):</label>
+                <input type="text" id="editLabel" readonly placeholder="标签由系统自动设置" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background-color: #f8f9fa; color: #6c757d;">
             </div>
-            <div style="margin-bottom: 1rem;">
-                <label>最大执行次数:</label>
-                <input type="number" id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label>持续时间(秒):</label>
+                    <input type="number" id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>最大执行次数:</label>
+                    <input type="number" id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>

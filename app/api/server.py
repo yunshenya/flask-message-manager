@@ -273,36 +273,60 @@ def stop_config_urls(config_id):
 @bp.route("/add_label", methods=["POST"])
 @token_required
 def add_label():
-    url_id = request.json['url_id']
-    label = request.json['label']
-    url = db.session.get(UrlData, url_id)
-    if not url:
-        return jsonify({'error': 'URL not found'}), 404
+    """添加URL标签 - 只有后端系统可以调用"""
+    try:
+        data = request.json
+        if not data or 'url_id' not in data or 'label' not in data:
+            return jsonify({'error': 'Missing url_id or label parameter'}), 400
 
-    url.label = label
-    url.updated_at = datetime.datetime.now()
-    db.session.commit()
+        url_id = int(data['url_id'])
+        label = data['label']
 
-    return jsonify({
-        'message': f'URL "{url.name}" add label successfully',
-        'url_data': url.to_dict()
-    })
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        url.label = label
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'URL "{url.name}" label updated successfully',
+            'url_data': url.to_dict()
+        })
+    except ValueError:
+        return jsonify({'error': 'Invalid url_id format'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 
-@bp.route("/status", methods=["POST"])
+@bp.route("/update_status", methods=["POST"])  # 重命名避免与add_label重复
 @token_required
-def add_label():
-    url_id = request.json['url_id']
-    status = request.json['status']
-    url = db.session.get(UrlData, url_id)
-    if not url:
-        return jsonify({'error': 'URL not found'}), 404
+def update_status():
+    """更新URL状态 - 只有后端系统可以调用"""
+    try:
+        data = request.json
+        if not data or 'url_id' not in data or 'status' not in data:
+            return jsonify({'error': 'Missing url_id or status parameter'}), 400
 
-    url.status = status
-    url.updated_at = datetime.datetime.now()
-    db.session.commit()
+        url_id = int(data['url_id'])
+        status = data['status']
 
-    return jsonify({
-        'message': f'URL "{url.name}" add status successfully',
-        'url_data': url.to_dict()
-    })
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        url.status = status
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'URL "{url.name}" status updated successfully',
+            'url_data': url.to_dict()
+        })
+    except ValueError:
+        return jsonify({'error': 'Invalid url_id format'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

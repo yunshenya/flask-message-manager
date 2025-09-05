@@ -152,6 +152,10 @@ async function loadDashboardData() {
         currentConfigData = statusData.config;
         updateStatistics(statusData);
         updateUrlList(urlsData.urls);
+
+        // 加载标签统计
+        await loadLabelStats();
+
         lastUpdateTime = Date.now();
         updatePageTitle();
 
@@ -188,11 +192,16 @@ function updateUrlList(urls) {
         let statusButton = getStatusButton(url);
         let runningInfo = getRunningInfo(url);
 
+        // 为有标签的URL添加特殊样式
+        const hasLabel = url.label && url.label.trim();
+        const labelClass = hasLabel ? 'url-item-labeled' : '';
+
         return `
-            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''}">
+            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''} ${labelClass}">
                 <div class="url-info">
                     <div class="url-name">
                         ${url.name}
+                        ${hasLabel ? `<span class="url-label-badge">${url.label}</span>` : ''}
                         ${runningInfo}
                     </div>
                     <div class="url-link">${url.url}</div>
@@ -203,6 +212,7 @@ function updateUrlList(urls) {
                             当前: ${url.current_count} | 
                             状态: ${url.is_active ? '激活' : '禁用'}
                             ${url.Last_time ? ' | 最后执行: ' + new Date(url.Last_time).toLocaleString() : ''}
+                            ${url.status ? ' | 状态: ' + url.status : ''}
                             ${getRunningDurationInfo(url)}
                         </small>
                     </div>
@@ -289,6 +299,89 @@ function updatePageTitle() {
 }
 
 // ================================
+// 标签统计功能
+// ================================
+async function loadLabelStats() {
+    if (!currentConfigId) return;
+
+    try {
+        const response = await apiCall(`/api/urls/labels?config_id=${currentConfigId}`);
+        updateLabelStats(response.labels);
+    } catch (error) {
+        console.error('加载标签统计失败:', error);
+    }
+}
+
+function updateLabelStats(labelStats) {
+    const statsContainer = document.getElementById('labelStats');
+    if (!statsContainer) return;
+
+    if (labelStats.length === 0) {
+        statsContainer.innerHTML = '<p style="color: #666; text-align: center;">暂无标签数据</p>';
+        return;
+    }
+
+    const statsHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            ${labelStats.map(stat => `
+                <div class="label-stat-card" style="background: white; padding: 1rem; border-radius: 4px; border-left: 4px solid #17a2b8;">
+                    <div style="font-weight: bold; color: #333; margin-bottom: 0.5rem;">${stat.label}</div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666;">
+                        <span>总计: ${stat.total}</span>
+                        <span>激活: ${stat.active}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-top: 0.25rem;">
+                        <span>运行中: ${stat.running}</span>
+                        <span>已完成: ${stat.completed}</span>
+                    </div>
+                    <button class="btn btn-sm btn-info" onclick="filterByLabel('${stat.label}')" style="width: 100%; margin-top: 0.5rem; font-size: 0.75rem;">
+                        筛选此标签
+                    </button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    statsContainer.innerHTML = statsHTML;
+}
+
+async function filterByLabel(label) {
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/api/urls/by-label/${encodeURIComponent(label)}?config_id=${currentConfigId}`);
+
+        updateUrlList(response.urls);
+
+        const filterInfo = document.getElementById('filterInfo');
+        if (filterInfo) {
+            filterInfo.innerHTML = `
+                <div class="alert alert-info" style="margin-bottom: 1rem;">
+                    <strong>当前筛选：</strong>标签 "${label}" (${response.total} 个URL)
+                    <button onclick="clearFilter()" class="btn btn-sm btn-secondary" style="margin-left: 1rem;">清除筛选</button>
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('按标签筛选失败:', error);
+        alert('筛选失败');
+    }
+}
+
+function clearFilter() {
+    const filterInfo = document.getElementById('filterInfo');
+    if (filterInfo) {
+        filterInfo.innerHTML = '';
+    }
+
+    loadDashboardData();
+}
+
+// ================================
 // URL运行控制功能
 // ================================
 async function startUrl(urlId, urlName) {
@@ -329,10 +422,11 @@ async function editUrl(urlId) {
 
         document.getElementById('editUrlId').value = urlData.id;
         document.getElementById('editUrl').value = urlData.url;
-        document.getElementById('editName').value = urlData.name;
+        document.getElementById('editName').value = urlData.original_name || urlData.name;
         document.getElementById('editDuration').value = urlData.duration;
         document.getElementById('editMaxNum').value = urlData.max_num;
         document.getElementById('editIsActive').checked = urlData.is_active;
+        document.getElementById('editLabel').value = urlData.label || '(暂无标签)';
 
         showEditUrlModal();
     } catch (error) {
