@@ -4,7 +4,6 @@ from app.models import User, ConfigData, UrlData
 app = create_app()
 
 def init_database():
-    """初始化数据库和默认用户"""
     try:
         with app.app_context():
             db.create_all()
@@ -19,12 +18,10 @@ def init_database():
                     is_admin=True
                 )
                 db.session.add(admin_user)
-                print("创建默认管理员用户: admin / admin123")
 
             # 创建默认机器配置
             existing_configs = ConfigData.query.count()
             if existing_configs == 0:
-                # 创建多台机器配置
                 machines = [
                     {
                         'message': '主服务器',
@@ -60,7 +57,6 @@ def init_database():
                     config_ids.append(config.id)
                     print(f"创建机器配置: {machine_data['message']} ({machine_data['pade_code']})")
 
-                # 为每台机器创建示例URL数据
                 telegram_urls = [
                     {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
                     {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
@@ -114,7 +110,5 @@ def init_database():
 
 if __name__ == '__main__':
     if init_database():
-        print("📍 访问地址: http://localhost:5000")
-        print("🔐 管理员账号: admin / admin123")
-        print("🖥️ 多机器管理系统已启动")
+        print("访问地址: http://localhost:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)

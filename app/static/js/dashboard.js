@@ -55,7 +55,7 @@ async function loadMachineList() {
         machines.forEach(machine => {
             const option = document.createElement('option');
             option.value = machine.id;
-            option.textContent = `${machine.message} (${machine.pade_code})`;
+            option.textContent = `${machine.pade_code}`;
             select.appendChild(option);
         });
 
@@ -93,13 +93,12 @@ function switchMachine() {
         currentConfigId = newConfigId;
         systemRunningMap.clear(); // 清除运行状态
         updateCurrentMachineInfo();
-        loadDashboardData();
+        loadDashboardData().then(r => {});
     }
 }
 
 function updateCurrentMachineInfo() {
     const infoDiv = document.getElementById('currentMachineInfo');
-    const nameSpan = document.getElementById('currentMachineName');
     const statusSpan = document.getElementById('currentMachineStatus');
     const codeSpan = document.getElementById('currentMachineCode');
 
@@ -110,7 +109,6 @@ function updateCurrentMachineInfo() {
 
     const machine = availableMachines.find(m => m.id === currentConfigId);
     if (machine) {
-        nameSpan.textContent = machine.message || '未命名机器';
         codeSpan.textContent = machine.pade_code || '无代码';
         statusSpan.textContent = machine.is_active ? '激活' : '禁用';
         statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
@@ -194,7 +192,7 @@ function updateUrlList(urls) {
                     <span class="count-display">${url.current_count}/${url.max_num}</span>
                     <div class="progress">
                         <div class="progress-bar ${progressPercent >= 100 ? 'completed' : ''}" 
-                             style="width: ${Math.min(progressPercent, 100)}%"></div>
+                                style="width: ${Math.min(progressPercent, 100)}%"></div>
                     </div>
                     <div class="url-actions">
                         ${statusButton}
@@ -220,7 +218,7 @@ function getStatusButton(url, isSystemRunning) {
 
 function updatePageTitle() {
     const time = new Date(lastUpdateTime).toLocaleTimeString();
-    const machineName = currentConfigData ? currentConfigData.message : '未选择';
+    const machineName = currentConfigData ? currentConfigData.pade_code : '未选择';
     document.title = `消息管理系统 - ${machineName} (${time})`;
 }
 
@@ -287,9 +285,7 @@ async function saveEditedUrl(event) {
     }
 }
 
-// ================================
-// URL添加功能
-// ================================
+
 function showAddUrlModal() {
     if (!currentConfigId) {
         alert('请先选择一台机器');
@@ -333,9 +329,7 @@ async function addUrl(event) {
     }
 }
 
-// ================================
-// URL删除功能
-// ================================
+
 async function deleteUrl(urlId, urlName) {
     if (!confirm(`确定要删除URL "${urlName}" 吗？此操作不可撤销。`)) {
         return;
@@ -469,7 +463,7 @@ async function startAllMachines() {
             });
             successCount++;
         } catch (error) {
-            console.error(`启动机器 ${machine.message} 失败:`, error);
+            console.error(`启动机器 ${machine.pade_code} 失败:`, error);
             failCount++;
         }
     }
@@ -499,7 +493,7 @@ async function stopAllMachines() {
             });
             successCount++;
         } catch (error) {
-            console.error(`停止机器 ${machine.message} 失败:`, error);
+            console.error(`停止机器 ${machine.pade_code} 失败:`, error);
             failCount++;
         }
     }
@@ -514,7 +508,7 @@ async function stopAllMachines() {
 // ================================
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
-    loadMachineManagementList();
+    loadMachineManagementList().then(r => {});
 }
 
 function hideMachineManagement() {
@@ -546,7 +540,7 @@ async function loadMachineManagementList() {
                     ${machines.map(machine => `
                         <tr>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.message}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
                                 <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
@@ -557,7 +551,7 @@ async function loadMachineManagementList() {
                                 <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
                                     ${machine.is_active ? '禁用' : '激活'}
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.message}')">删除</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.pade_code}')">删除</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -573,7 +567,6 @@ async function addMachine(event) {
     event.preventDefault();
 
     const data = {
-        message: document.getElementById('newMachineName').value,
         pade_code: document.getElementById('newMachineCode').value,
         description: document.getElementById('newMachineDesc').value
     };
