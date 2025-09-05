@@ -254,3 +254,42 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 .tooltip:hover::after {
     opacity: 1;
 }
+
+.url-item-labeled {
+    border-left: 3px solid #17a2b8;
+    background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%);
+}
+
+.url-label-badge {
+    background: #17a2b8 !important;
+    color: white !important;
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+    font-size: 0.75rem !important;
+    margin-left: 0.5rem !important;
+    font-weight: bold;
+}
+
+.label-stat-card {
+    transition: transform 0.2s ease;
+}
+
+.label-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.alert {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
