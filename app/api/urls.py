@@ -154,7 +154,6 @@ def reset_url_count(url_id):
             return jsonify({'error': 'URL not found'}), 404
 
         url.current_count = 0
-        url.last_time = None
         url.updated_at = datetime.datetime.now()
         db.session.commit()
 
