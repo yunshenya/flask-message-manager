@@ -210,8 +210,6 @@ async function loadDashboardData() {
                 `<span class="btn btn-info btn-sm">已完成 (${url.current_count}/${url.max_num})</span>`
             }
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
-                        <button class="btn btn-primary btn-sm" onclick="startMachine()" title="启动机器">启动</button>
-                        <button class="btn btn-danger btn-sm" onclick="stopMachine()" title="停止机器">停止</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
                         <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
                     </div>
@@ -355,7 +353,8 @@ async function startMachine(padeCode = null) {
         alert('启动成功: ' + result.message + ' (设备: ' + code + ')');
         await loadDashboardData();
     } catch (error) {
-        console.error('启动失败:', error);
+        alert('启动失败:' + error);
+        throw error; // 重新抛出错误以便上层处理
     }
 }
 
@@ -380,12 +379,14 @@ async function stopMachine(padeCode = null) {
         // 停止成功后，清空所有URL的系统运行状态
         systemRunningMap.clear();
 
-        alert('停止成功: ' + result.message + ' (设备: ' + code + ')');
+        console.log('停止成功: ' + result.message + ' (设备: ' + code + ')');
         await loadDashboardData();
     } catch (error) {
         console.error('停止失败:', error);
+        throw error; // 重新抛出错误以便上层处理
     }
 }
+
 
 // 页面加载时初始化数据
 document.addEventListener('DOMContentLoaded', loadDashboardData);
