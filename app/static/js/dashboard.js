@@ -250,14 +250,12 @@ async function executeUrlAndStart(urlId) {
         // 先执行URL
         const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
 
-        // 执行成功后，设置系统运行状态为true（不单独启动机器）
         systemRunningMap.set(urlId, true);
 
         alert('执行成功: ' + result.message);
 
     } catch (error) {
         console.error('执行失败:', error);
-        // 执行失败，不设置运行状态，按钮将在重新加载数据时恢复为"未执行"
     } finally {
         // 无论成功失败，都从执行中集合移除
         executingUrls.delete(urlId);
@@ -267,16 +265,6 @@ async function executeUrlAndStart(urlId) {
     }
 }
 
-// 单独的执行URL函数（保留原有功能）
-async function executeUrl(urlId) {
-    try {
-        const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
-        alert('执行成功: ' + result.message);
-        await loadDashboardData();
-    } catch (error) {
-        // 错误已在apiCall中处理
-    }
-}
 
 // 批量执行所有可用URL
 async function executeAvailable() {
@@ -303,13 +291,9 @@ async function executeAvailable() {
         // 立即更新UI显示所有URL为"执行中"状态
         await loadDashboardData();
 
-        // 显示批量执行开始提示
-        console.log(`开始批量执行 ${availableUrls.length} 个URL...`);
-
         // 逐个执行可用的URL
         for (let i = 0; i < availableUrls.length; i++) {
             const url = availableUrls[i];
-            console.log(`正在执行 ${i + 1}/${availableUrls.length}: ${url.name}`);
 
             try {
                 const result = await apiCall(`/api/url/${url.id}/execute`, { method: 'POST' });
@@ -365,6 +349,7 @@ async function startAllMachines() {
     try {
         // 启动机器
         await startMachine(currentConfigData.pade_code);
+        await executeAvailable()
         // 获取当前URL数据
         const urlsData = await apiCall('/api/config/1/urls');
         const availableUrls = urlsData.urls.filter(url => url.can_execute && url.is_active);
