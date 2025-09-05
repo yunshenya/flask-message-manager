@@ -170,24 +170,38 @@ async function loadDashboardData() {
             return;
         }
 
+        console.log('当前systemRunningMap状态:', Object.fromEntries(systemRunningMap));
+
         urlList.innerHTML = urlsData.urls.map(url => {
             const isExecuting = executingUrls.has(url.id);
             const isSystemRunning = systemRunningMap.get(url.id) || false;
 
-            let buttonText, buttonClass, buttonDisabled;
+            console.log(`URL ${url.name} (ID: ${url.id}): can_execute=${url.can_execute}, isExecuting=${isExecuting}, isSystemRunning=${isSystemRunning}, Map有这个ID吗:${systemRunningMap.has(url.id)}`);
 
-            if (isExecuting) {
-                buttonText = '执行中...';
-                buttonClass = 'btn btn-warning btn-sm';
-                buttonDisabled = 'disabled';
-            } else if (isSystemRunning) {
-                buttonText = '已启动';
-                buttonClass = 'btn btn-success btn-sm';
-                buttonDisabled = '';
+            let buttonContent;
+
+            if (!url.can_execute) {
+                // URL已完成最大执行次数，显示已完成状态
+                buttonContent = `<span class="btn btn-info btn-sm">已完成 (${url.current_count}/${url.max_num})</span>`;
             } else {
-                buttonText = '未执行';
-                buttonClass = 'btn btn-secondary btn-sm';
-                buttonDisabled = '';
+                // URL可以执行，显示按钮
+                let buttonText, buttonClass, buttonDisabled;
+
+                if (isExecuting) {
+                    buttonText = '执行中...';
+                    buttonClass = 'btn btn-warning btn-sm';
+                    buttonDisabled = 'disabled';
+                } else if (isSystemRunning) {
+                    buttonText = '已启动';
+                    buttonClass = 'btn btn-success btn-sm';
+                    buttonDisabled = '';
+                } else {
+                    buttonText = '未执行';
+                    buttonClass = 'btn btn-secondary btn-sm';
+                    buttonDisabled = '';
+                }
+
+                buttonContent = `<button class="${buttonClass}" onclick="executeUrlAndStart(${url.id})" ${buttonDisabled}>${buttonText}</button>`;
             }
 
             return `
@@ -205,10 +219,7 @@ async function loadDashboardData() {
                         <div class="progress-bar" style="width: ${(url.current_count / url.max_num) * 100}%"></div>
                     </div>
                     <div class="url-actions">
-                        ${url.can_execute ?
-                `<button class="${buttonClass}" onclick="executeUrlAndStart(${url.id})" ${buttonDisabled}>${buttonText}</button>` :
-                `<span class="btn btn-info btn-sm">已完成 (${url.current_count}/${url.max_num})</span>`
-            }
+                        ${buttonContent}
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
                         <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
@@ -239,14 +250,8 @@ async function executeUrlAndStart(urlId) {
         // 先执行URL
         const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
 
-        // 执行成功后启动机器
-        if (currentConfigData && currentConfigData.pade_code) {
-            await startMachine(currentConfigData.pade_code);
-            // 执行成功且机器启动后，设置系统运行状态为true
-            systemRunningMap.set(urlId, true);
-        } else {
-            alert('警告: 没有找到 pade_code，无法启动机器');
-        }
+        // 执行成功后，设置系统运行状态为true（不单独启动机器）
+        systemRunningMap.set(urlId, true);
 
         alert('执行成功: ' + result.message);
 
@@ -270,6 +275,128 @@ async function executeUrl(urlId) {
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
+    }
+}
+
+// 批量执行所有可用URL
+async function executeAvailable() {
+    if (!confirm('确定要执行所有可用的URL吗？')) return;
+
+    try {
+        // 获取当前URL数据
+        const urlsData = await apiCall('/api/config/1/urls');
+        const availableUrls = urlsData.urls.filter(url => url.can_execute && url.is_active);
+
+        if (availableUrls.length === 0) {
+            alert('没有可执行的URL');
+            return;
+        }
+
+        let successCount = 0;
+        let failCount = 0;
+
+        // 首先将所有要执行的URL添加到执行中状态
+        availableUrls.forEach(url => {
+            executingUrls.add(url.id);
+        });
+
+        // 立即更新UI显示所有URL为"执行中"状态
+        await loadDashboardData();
+
+        // 显示批量执行开始提示
+        console.log(`开始批量执行 ${availableUrls.length} 个URL...`);
+
+        // 逐个执行可用的URL
+        for (let i = 0; i < availableUrls.length; i++) {
+            const url = availableUrls[i];
+            console.log(`正在执行 ${i + 1}/${availableUrls.length}: ${url.name}`);
+
+            try {
+                const result = await apiCall(`/api/url/${url.id}/execute`, { method: 'POST' });
+                systemRunningMap.set(url.id, true); // 设置为已启动状态
+                successCount++;
+
+                console.log(`✓ URL ${url.name} 执行成功`);
+
+            } catch (error) {
+                console.error(`✗ URL ${url.name} 执行失败:`, error);
+                failCount++;
+            }
+
+            // 从执行中移除当前URL并更新UI
+            executingUrls.delete(url.id);
+            await loadDashboardData();
+
+            // 如果不是最后一个，稍微延迟一下以便用户看到状态变化
+            if (i < availableUrls.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+
+        // 执行完成后启动机器
+        if (successCount > 0 && currentConfigData && currentConfigData.pade_code) {
+            console.log('正在启动机器...');
+            await startMachine(currentConfigData.pade_code);
+        }
+
+        alert(`批量执行完成！\n成功: ${successCount}个\n失败: ${failCount}个`);
+
+    } catch (error) {
+        console.error('批量执行失败:', error);
+        // 清理所有执行状态
+        executingUrls.clear();
+        await loadDashboardData();
+        alert('批量执行过程中发生错误，请查看控制台日志');
+    }
+}
+
+// 启动全部机器
+async function startAllMachines() {
+
+    if (!currentConfigData || !currentConfigData.pade_code) {
+        alert('没有找到机器配置信息');
+        return;
+    }
+
+    if (!confirm('确定要启动机器吗？这将标记所有可用的URL为已启动状态。')) {
+        return;
+    }
+
+    try {
+        // 启动机器
+        await startMachine(currentConfigData.pade_code);
+        // 获取当前URL数据
+        const urlsData = await apiCall('/api/config/1/urls');
+        const availableUrls = urlsData.urls.filter(url => url.can_execute && url.is_active);
+        availableUrls.forEach(url => {
+            console.log(`正在设置URL ${url.id} 为已启动状态`);
+            systemRunningMap.set(url.id, true);
+        });
+
+        console.log('设置完成后的systemRunningMap:', Object.fromEntries(systemRunningMap));
+
+        // 更新界面
+        await loadDashboardData();
+    } catch (error) {
+        console.error('启动机器失败:', error);
+        alert('启动机器失败，请检查网络连接和配置');
+    }
+}
+
+// 停止全部机器
+async function stopAllMachines() {
+    if (!currentConfigData || !currentConfigData.pade_code) {
+        alert('没有找到机器配置信息');
+        return;
+    }
+
+    if (!confirm('确定要停止机器吗？这将重置所有URL的运行状态。')) return;
+
+    try {
+        await stopMachine(currentConfigData.pade_code);
+        alert('机器停止成功！');
+    } catch (error) {
+        console.error('停止机器失败:', error);
     }
 }
 
@@ -350,17 +477,16 @@ async function startMachine(padeCode = null) {
             })
         });
 
-        alert('启动成功: ' + result.message + ' (设备: ' + code + ')');
+        console.log('启动成功: ' + result.message + ' (设备: ' + code + ')');
         await loadDashboardData();
     } catch (error) {
-        alert('启动失败:' + error);
+        console.error('启动失败:', error);
         throw error; // 重新抛出错误以便上层处理
     }
 }
 
 // 停止机器函数
 async function stopMachine(padeCode = null) {
-    // 如果没有传递 padeCode，使用配置中的
     const code = padeCode || (currentConfigData ? currentConfigData.pade_code : null);
 
     if (!code) {
@@ -386,7 +512,6 @@ async function stopMachine(padeCode = null) {
         throw error; // 重新抛出错误以便上层处理
     }
 }
-
 
 // 页面加载时初始化数据
 document.addEventListener('DOMContentLoaded', loadDashboardData);
