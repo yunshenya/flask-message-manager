@@ -9,7 +9,7 @@ class UrlData(db.Model):
     url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     duration = db.Column(db.Integer, nullable=False, default=30)
-    last_time = db.Column(db.DateTime)
+    last_time = db.Column(db.DateTime, nullable=True, default=datetime.datetime.now())
     max_num = db.Column(db.Integer, nullable=False, default=3)
     current_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)

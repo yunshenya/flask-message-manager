@@ -17,6 +17,7 @@ class ConfigData(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     description = db.Column(db.Text)
     pade_code = db.Column(db.Text)
+    name = db.Column(db.Text)
     message = db.Column(VARCHAR(100), nullable=False)
 
     urls: Mapped[List["UrlData"]] = relationship(backref='config', cascade='all, delete-orphan')
@@ -32,5 +33,6 @@ class ConfigData(db.Model):
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'urldata': [url.to_dict() for url in self.urls if url.is_active],
             'pade_code': self.pade_code,
-            'message': self.message
+            'message': self.message,
+            'name': self.name,
         }

@@ -124,3 +124,8 @@ def stop_app(pad_code_list: list[str]):
         "padCodes": pad_code_list
     }
     return VmosUtil(stop_app_url, body).send()
+
+
+def get_phone_list() -> dict[str, str]:
+    list_url = "/vcpcloud/api/padApi/userPadList"
+    return VmosUtil(list_url).send()

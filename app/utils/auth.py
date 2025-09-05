@@ -7,7 +7,9 @@ import requests
 
 
 class VmosUtil(object):
-    def __init__(self, url, data):
+    def __init__(self, url, data=None):
+        if data is None:
+            data = {}
         self._url = url
         self._data = data
         self._ak = "nx9xwcQ5KEap2nUqrJZTBoxJK7G61uvj"
@@ -19,7 +21,6 @@ class VmosUtil(object):
 
     def _get_signature(self):
         json_string = json.dumps(self._data, separators=(',', ':'), ensure_ascii=False)
-        print(json_string)
 
         # 计算SHA-256哈希值
         hash_object = hashlib.sha256(json_string.encode())

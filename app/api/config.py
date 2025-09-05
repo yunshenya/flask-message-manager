@@ -10,30 +10,15 @@ from app.auth.decorators import login_required, token_required
 @bp.route('/config', methods=['GET'])
 @token_required
 def get_config():
-    """获取配置数据"""
-    pade_code = request.args.get('pade_code')
-    config_id = request.args.get('config_id', type=int)
-    if config_id:
-        config = db.session.get(ConfigData, config_id)
-        if not config:
-            return jsonify({'error': 'Config not found'}), 404
-        if pade_code:
-            try:
-                config.pade_code = pade_code
-                db.session.commit()
-            except Exception as e:
-                print(f"Error saving pade_code: {e}")
-                db.session.rollback()
-        return jsonify(config.to_dict()), 200
-    else:
-        config = ConfigData.query.filter_by(is_active=True).first()
-        if config:
-            return jsonify({
-                'success_time': [config.success_time_min, config.success_time_max],
-                'reset_time': config.reset_time,
-                'urldata': [url.to_dict() for url in config.urls if url.is_active]
-            })
-        return jsonify({'success_time': [5, 10], 'reset_time': 0, 'urldata': []}), 200
+    pade_code = request.json.get('pade_code')
+    config = ConfigData.query.filter_by(pade_code=pade_code).first()
+    if config:
+        return jsonify({
+            'success_time': [config.success_time_min, config.success_time_max],
+            'reset_time': config.reset_time,
+            'urldata': [url.to_dict() for url in config.urls if url.is_active]
+        })
+    return jsonify({'error': 'Config not found'}), 404
 
 
 @bp.route('/config/<int:config_id>/urls', methods=['GET'])
