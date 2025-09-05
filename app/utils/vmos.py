@@ -118,10 +118,11 @@ def reboot(pad_code_list: list[str]):
     return  VmosUtil(reboot_url, body).send()
 
 
-def stop_app(pad_code_list: list[str]):
+def stop_app(pad_code_list: list[str], package_name: str) -> dict[str, str]:
     stop_app_url = "/vcpcloud/api/padApi/stopApp"
     body = {
-        "padCodes": pad_code_list
+        "padCodes": pad_code_list,
+        "pkgName": package_name,
     }
     return VmosUtil(stop_app_url, body).send()
 

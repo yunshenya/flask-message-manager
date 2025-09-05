@@ -49,9 +49,9 @@ def stop():
     pad_code: str = data.get("pade_code")
     if not pad_code:
         return jsonify({"error": "padcode 参数缺失"}), 400
-    stop_app([pad_code])
-    logger.success(f"{pad_code}: 停止成功")
-    return jsonify({"message": "停止成功", "padcode": pad_code})
+    result = stop_app([pad_code], package_name=Config.PKG_NAME)
+    logger.success(f"{pad_code}: 停止成功, {result}")
+    return jsonify({"message": "停止成功", "msg": result})
 
 
 
@@ -64,9 +64,9 @@ def start():
     pad_code: str = data.get("pade_code")
     if not pad_code:
         return jsonify({"error": "padcode 参数缺失"}), 400
-    start_app([pad_code], pkg_name= Config.PKG_NAME)
-    logger.success(f"{pad_code}: 启动成功")
-    return jsonify({"message": "启动成功", "padcode": pad_code})
+    result = start_app([pad_code], pkg_name= Config.PKG_NAME)
+    logger.success(f"{pad_code}: 启动成功, {result}")
+    return jsonify({"message": "启动成功", "msg": result})
 
 
 @bp.route("/add_execute_num", methods=["POST"])

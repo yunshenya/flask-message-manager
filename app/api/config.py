@@ -83,7 +83,6 @@ def reset_config_counts(config_id):
         urls = UrlData.query.filter_by(config_id=config_id).all()
         for url in urls:
             url.current_count = 0
-            url.last_time = None
             url.updated_at = datetime.datetime.now()
 
         db.session.commit()
