@@ -88,7 +88,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     font-size: 0.75rem;
     font-weight: bold;
     margin-left: 0.5rem;
-    animation: none;
 }
 .status-pending {
     background: #e9ecef;
@@ -97,7 +96,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 .status-executing {
     background: #fff3cd;
     color: #856404;
-    animation: pulse-executing 2s infinite;
 }
 .status-completed {
     background: #d4edda;
@@ -106,13 +104,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 .status-failed {
     background: #f8d7da;
     color: #721c24;
-}
-
-/* 运行状态动画 */
-@keyframes pulse-executing {
-    0% { opacity: 1; }
-    50% { opacity: 0.6; }
-    100% { opacity: 1; }
 }
 
 /* 运行中的URL项目样式 */
@@ -193,6 +184,257 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     padding: 0.2rem 0.4rem;
 }
 
+.url-item-labeled {
+    border-left: 3px solid #17a2b8;
+    background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%);
+}
+
+.url-label-badge {
+    background: #17a2b8 !important;
+    color: white !important;
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+    font-size: 0.75rem !important;
+    margin-left: 0.5rem !important;
+    font-weight: bold;
+}
+
+.label-stat-card {
+    transition: transform 0.2s ease;
+}
+
+.label-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* ================================
+   白色主题实时状态显示框样式
+   ================================ */
+
+/* 实时状态显示框样式 - 白色主题 */
+.status-display {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-top: 0.75rem;
+    min-height: 50px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.status-display.has-status {
+    background: #ffffff;
+    border-color: #007bff;
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+}
+
+.status-display.empty {
+    background: #ffffff;
+    border-color: #dee2e6;
+    border-style: dashed;
+}
+
+.status-content {
+    font-size: 0.9rem;
+    color: #333333;
+    line-height: 1.4;
+    word-wrap: break-word;
+    margin-top: 0.25rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.status-content.empty {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.status-label {
+    font-size: 0.75rem;
+    color: #495057;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-label::before {
+    content: "📊";
+    font-size: 0.8rem;
+}
+
+/* 状态更新动画 - 白色主题 */
+.status-display.updating {
+    animation: statusUpdateWhite 0.4s ease-in-out;
+}
+
+@keyframes statusUpdateWhite {
+    0% {
+        opacity: 0.8;
+        background: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    100% {
+        opacity: 1;
+        background: #ffffff;
+        border-color: #007bff;
+    }
+}
+
+/* 状态指示器 - 白色主题 */
+.status-indicator {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #dc3545;
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+.status-indicator.active {
+    background: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.3);
+}
+
+/* 不同状态类型的样式 - 白色背景版本 */
+.status-display.status-success {
+    background: #ffffff;
+    border-color: #28a745;
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.15);
+}
+
+.status-display.status-warning {
+    background: #ffffff;
+    border-color: #ffc107;
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+}
+
+.status-display.status-error {
+    background: #ffffff;
+    border-color: #dc3545;
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.15);
+}
+
+.status-display.status-info {
+    background: #ffffff;
+    border-color: #17a2b8;
+    border-width: 2px;
+    box-shadow: 0 2px 8px rgba(23, 162, 184, 0.15);
+}
+
+/* 状态内容特殊格式 - 白色主题 */
+.status-content.status-success {
+    color: #155724;
+    font-weight: 500;
+}
+
+.status-content.status-warning {
+    color: #856404;
+    font-weight: 500;
+}
+
+.status-content.status-error {
+    color: #721c24;
+    font-weight: 500;
+}
+
+.status-content.status-info {
+    color: #0c5460;
+    font-weight: 500;
+}
+
+/* URL项目运行状态增强 - 白色主题 */
+.url-item.running .status-display {
+    border-left: 4px solid #28a745;
+    background: #ffffff;
+}
+
+.url-item.completed .status-display {
+    border-left: 4px solid #6c757d;
+    background: #ffffff;
+    opacity: 0.9;
+}
+
+.url-item.error .status-display {
+    border-left: 4px solid #dc3545;
+    background: #ffffff;
+}
+
+/* 状态时间戳 */
+.status-timestamp {
+    font-size: 0.7rem;
+    color: #6c757d;
+    position: absolute;
+    bottom: 4px;
+    right: 24px;
+    font-style: italic;
+}
+
+/* 状态历史按钮 */
+.status-history-btn {
+    position: absolute;
+    top: 8px;
+    right: 30px;
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+}
+
+.status-history-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #495057;
+}
+
+/* 状态图标 */
+.status-icon {
+    display: inline-block;
+    margin-right: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.status-icon.success::before { content: "✅"; }
+.status-icon.warning::before { content: "⚠️"; }
+.status-icon.error::before { content: "❌"; }
+.status-icon.info::before { content: "ℹ️"; }
+.status-icon.loading::before {
+    content: "🔄";
+}
+
+/* 状态进度条 */
+.status-progress {
+    width: 100%;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.status-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4299e1, #667eea);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
     .url-item {
@@ -225,6 +467,27 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     .machine-select {
         width: 100%;
     }
+
+    .status-display {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        min-height: 40px;
+    }
+
+    .status-label {
+        font-size: 0.7rem;
+    }
+
+    .status-content {
+        font-size: 0.85rem;
+    }
+
+    .status-indicator {
+        width: 8px;
+        height: 8px;
+        top: 8px;
+        right: 8px;
+    }
 }
 
 /* 工具提示样式 */
@@ -255,41 +518,48 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     opacity: 1;
 }
 
-.url-item-labeled {
-    border-left: 3px solid #17a2b8;
-    background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%);
-}
+/* 暗色主题支持 - 强制保持白色 */
+@media (prefers-color-scheme: dark) {
+    .status-display {
+        background: #ffffff !important;
+        border-color: #e9ecef;
+        color: #333333;
+    }
 
-.url-label-badge {
-    background: #17a2b8 !important;
-    color: white !important;
-    padding: 0.1rem 0.3rem !important;
-    border-radius: 3px !important;
-    font-size: 0.75rem !important;
-    margin-left: 0.5rem !important;
-    font-weight: bold;
-}
+    .status-display.has-status {
+        background: #ffffff !important;
+        border-color: #007bff;
+    }
 
-.label-stat-card {
-    transition: transform 0.2s ease;
-}
+    .status-display.status-success {
+        background: #ffffff !important;
+        border-color: #28a745;
+    }
 
-.label-stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
+    .status-display.status-warning {
+        background: #ffffff !important;
+        border-color: #ffc107;
+    }
 
-.alert {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
+    .status-display.status-error {
+        background: #ffffff !important;
+        border-color: #dc3545;
+    }
 
-.alert-info {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
+    .status-display.status-info {
+        background: #ffffff !important;
+        border-color: #17a2b8;
+    }
+
+    .status-content {
+        color: #333333;
+    }
+
+    .status-content.empty {
+        color: #6c757d;
+    }
+
+    .status-label {
+        color: #495057;
+    }
 }

@@ -293,7 +293,7 @@ def add_label():
         return jsonify({
             'message': f'URL "{url.name}" label updated successfully',
             'url_data': url.to_dict()
-        })
+        }), 200
     except ValueError:
         return jsonify({'error': 'Invalid url_id format'}), 400
     except Exception as e:
@@ -324,7 +324,7 @@ def update_status():
         return jsonify({
             'message': f'URL "{url.name}" status updated successfully',
             'url_data': url.to_dict()
-        })
+        }), 200
     except ValueError:
         return jsonify({'error': 'Invalid url_id format'}), 400
     except Exception as e:
