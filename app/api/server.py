@@ -51,6 +51,8 @@ def stop():
         return jsonify({"error": "padcode 参数缺失"}), 400
     result = stop_app([pad_code], package_name=Config.PKG_NAME)
     logger.success(f"{pad_code}: 停止成功, {result}")
+    result_tg = stop_app([pad_code], package_name=Config.TG_PKG_NAME)
+    logger.success(f"{pad_code}: 停止成功, {result_tg}")
     return jsonify({"message": "停止成功", "msg": result})
 
 
