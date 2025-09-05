@@ -567,6 +567,8 @@ async function addMachine(event) {
     event.preventDefault();
 
     const data = {
+        name:  document.getElementById('newMachineName').value,
+        message : document.getElementById('newMachineMessage').value,
         pade_code: document.getElementById('newMachineCode').value,
         description: document.getElementById('newMachineDesc').value
     };

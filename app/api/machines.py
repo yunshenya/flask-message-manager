@@ -24,7 +24,7 @@ def create_machine():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
 
-        required_fields = ['message', 'pade_code']
+        required_fields = ['message', 'pade_code', 'name', 'description']
         for field in required_fields:
             if field not in data or not data[field].strip():
                 return jsonify({'error': f'Missing required field: {field}'}), 400
