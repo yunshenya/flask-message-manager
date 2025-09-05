@@ -1,16 +1,3 @@
--- ================================
--- 数据库初始化脚本
--- ================================
-
--- 如果数据库不存在则创建
--- CREATE DATABASE your_database_name;
-
--- 使用数据库
--- \c your_database_name;
-
--- ================================
--- 主配置表
--- ================================
 CREATE TABLE IF NOT EXISTS config_data (
                                             id SERIAL PRIMARY KEY,
                                             success_time_min INTEGER NOT NULL DEFAULT 5,
@@ -20,6 +7,7 @@ CREATE TABLE IF NOT EXISTS config_data (
                                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                            is_active BOOLEAN DEFAULT TRUE,
                                            pade_code TEXT,
+                                           name TEXT,
                                            description TEXT,
                                            message varchar(100)
 );
