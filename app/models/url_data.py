@@ -1,4 +1,7 @@
 import datetime
+
+from sqlalchemy import TEXT
+
 from app import db
 
 class UrlData(db.Model):
@@ -13,8 +16,16 @@ class UrlData(db.Model):
     max_num = db.Column(db.Integer, nullable=False, default=3)
     current_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
+
+    # 新增运行状态字段
+    is_running = db.Column(db.Boolean, default=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    stopped_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.datetime.now())
+    status = db.Column(TEXT, nullable=False)
+    label = db.Column(TEXT, nullable=False)
 
     def to_dict(self):
         return {
@@ -27,16 +38,67 @@ class UrlData(db.Model):
             'current_count': self.current_count,
             'is_active': self.is_active,
             'can_execute': self.current_count < self.max_num,
-            'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith('https://t.me/') else self.url
+            'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith('https://t.me/') else self.url,
+            # 新增运行状态信息
+            'is_running': self.is_running,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'stopped_at': self.stopped_at.isoformat() if self.stopped_at else None,
+            'running_duration': self.get_running_duration(),
+            'label': self.label,
+
         }
 
     def can_execute(self):
         return self.current_count < self.max_num
 
     def execute(self):
+        """执行URL并更新计数，如果达到最大次数则自动停止运行"""
         if self.can_execute():
             self.current_count += 1
             self.last_time = datetime.datetime.now()
             self.updated_at = datetime.datetime.now()
+
+            # 如果达到最大次数，自动停止运行
+            if self.current_count >= self.max_num:
+                self.is_running = False
+                self.stopped_at = datetime.datetime.now()
+
             return True
         return False
+
+    def start_running(self):
+        """开始运行状态"""
+        if self.can_execute() and self.is_active:
+            self.is_running = True
+            self.started_at = datetime.datetime.now()
+            self.stopped_at = None
+            self.updated_at = datetime.datetime.now()
+            return True
+        return False
+
+    def stop_running(self):
+        """停止运行状态"""
+        if self.is_running:
+            self.is_running = False
+            self.stopped_at = datetime.datetime.now()
+            self.updated_at = datetime.datetime.now()
+            return True
+        return False
+
+    def reset_counts(self):
+        """重置计数和运行状态"""
+        self.current_count = 0
+        self.last_time = None
+        self.is_running = False
+        self.started_at = None
+        self.stopped_at = None
+        self.updated_at = datetime.datetime.now()
+
+    def get_running_duration(self):
+        """获取运行时长（秒）"""
+        if not self.started_at:
+            return 0
+
+        end_time = self.stopped_at if self.stopped_at else datetime.datetime.now()
+        duration = (end_time - self.started_at).total_seconds()
+        return int(duration)

@@ -61,14 +61,16 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 .btn-info { background: #17a2b8; color: white; }
 .btn:hover:not(:disabled) { opacity: 0.8; transform: translateY(-1px); }
 .url-list { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.url-item { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+.url-item { padding: 1rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; transition: background-color 0.3s ease; }
 .url-item:last-child { border-bottom: none; }
+.url-item.completed { background-color: #f8f9fa; }
 .url-info { flex: 1; }
-.url-name { font-weight: bold; color: #333; }
+.url-name { font-weight: bold; color: #333; display: flex; align-items: center; gap: 0.5rem; }
 .url-link { color: #666; font-size: 0.9rem; }
 .url-stats { display: flex; gap: 1rem; align-items: center; }
 .progress { background: #e9ecef; height: 6px; border-radius: 3px; overflow: hidden; width: 100px; }
 .progress-bar { background: #007bff; height: 100%; transition: width 0.3s; }
+.progress-bar.completed { background: #28a745; }
 .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
 .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
 .alert-danger { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
@@ -86,11 +88,63 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     font-size: 0.75rem;
     font-weight: bold;
     margin-left: 0.5rem;
+    animation: none;
 }
-.status-pending { background: #e9ecef; color: #6c757d; }
-.status-executing { background: #fff3cd; color: #856404; }
-.status-completed { background: #d4edda; color: #155724; }
-.status-failed { background: #f8d7da; color: #721c24; }
+.status-pending {
+    background: #e9ecef;
+    color: #6c757d;
+}
+.status-executing {
+    background: #fff3cd;
+    color: #856404;
+    animation: pulse-executing 2s infinite;
+}
+.status-completed {
+    background: #d4edda;
+    color: #155724;
+}
+.status-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* 运行状态动画 */
+@keyframes pulse-executing {
+    0% { opacity: 1; }
+    50% { opacity: 0.6; }
+    100% { opacity: 1; }
+}
+
+/* 运行中的URL项目样式 */
+.url-item.running {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(90deg, #f8fff9 0%, #ffffff 100%);
+}
+
+.url-item.running .url-name {
+    color: #155724;
+}
+
+/* 已完成的URL项目样式 */
+.url-item.completed {
+    border-left: 4px solid #6c757d;
+    background: linear-gradient(90deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+.url-item.completed .url-name {
+    color: #6c757d;
+}
+
+/* 运行时长显示 */
+.running-duration {
+    font-size: 0.75rem;
+    color: #28a745;
+    font-weight: bold;
+    background: #d4edda;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    margin-left: 0.5rem;
+}
 
 /* 加载状态 */
 .loading { opacity: 0.6; pointer-events: none; }
@@ -107,4 +161,96 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* 状态统计卡片增强 */
+.stat-card.running {
+    border-left: 4px solid #28a745;
+}
+
+.stat-card.completed {
+    border-left: 4px solid #6c757d;
+}
+
+.stat-card.available {
+    border-left: 4px solid #17a2b8;
+}
+
+.stat-card.total {
+    border-left: 4px solid #007bff;
+}
+
+/* 控制按钮组样式 */
+.control-buttons {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.control-buttons .btn {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.4rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .url-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .url-stats {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .url-actions {
+        justify-content: flex-start;
+    }
+
+    .machine-selector {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .machine-select-group {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .machine-select {
+        width: 100%;
+    }
+}
+
+/* 工具提示样式 */
+.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 1000;
+}
+
+.tooltip:hover::after {
+    opacity: 1;
 }

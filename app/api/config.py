@@ -1,10 +1,10 @@
-import datetime
 from flask import jsonify, request
-from app.api import bp
+
 from app import db
+from app.api import bp
+from app.auth.decorators import login_required, token_required
 from app.models.config_data import ConfigData
 from app.models.url_data import UrlData
-from app.auth.decorators import login_required, token_required
 
 
 @bp.route('/config', methods=['GET'])
@@ -45,6 +45,7 @@ def get_config_urls(config_id):
             'total': len(urls),
             'active': len([url for url in urls if url.is_active]),
             'available': len([url for url in urls if url.can_execute() and url.is_active]),
+            'running': len([url for url in urls if url.is_running and url.is_active]),
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -66,8 +67,10 @@ def get_config_status(config_id):
             'total_urls': len(urls),
             'available_urls': len([url for url in urls if url.can_execute()]),
             'completed_urls': len([url for url in urls if url.current_count >= url.max_num]),
+            'running_urls': len([url for url in urls if url.is_running]),
             'total_executions': sum(url.current_count for url in urls),
-            'max_possible_executions': sum(url.max_num for url in urls)
+            'max_possible_executions': sum(url.max_num for url in urls),
+            'total_running_time': sum(url.get_running_duration() for url in urls if url.is_running)
         }
 
         return jsonify(stats)
@@ -78,15 +81,118 @@ def get_config_status(config_id):
 @bp.route('/config/<int:config_id>/reset', methods=['POST'])
 @login_required
 def reset_config_counts(config_id):
-    """重置配置的URL计数"""
+    """重置配置的URL计数和运行状态"""
     try:
         urls = UrlData.query.filter_by(config_id=config_id).all()
         for url in urls:
-            url.current_count = 0
-            url.updated_at = datetime.datetime.now()
+            url.reset_counts()
 
         db.session.commit()
         return jsonify({'message': f'Reset {len(urls)} URLs successfully'})
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/config/<int:config_id>/start-all', methods=['POST'])
+@login_required
+def start_all_config_urls(config_id):
+    """启动配置下的所有可用URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(
+            config_id=config_id,
+            is_active=True
+        ).filter(UrlData.current_count < UrlData.max_num).all()
+
+        started_count = 0
+        for url in urls:
+            if url.start_running():
+                started_count += 1
+
+        db.session.commit()
+        return jsonify({
+            'message': f'Started {started_count} URLs successfully',
+            'total_available': len(urls),
+            'started': started_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/config/<int:config_id>/stop-all', methods=['POST'])
+@login_required
+def stop_all_config_urls(config_id):
+    """停止配置下的所有运行中的URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(config_id=config_id, is_running=True).all()
+
+        stopped_count = 0
+        for url in urls:
+            if url.stop_running():
+                stopped_count += 1
+
+        db.session.commit()
+        return jsonify({
+            'message': f'Stopped {stopped_count} URLs successfully',
+            'total_running': len(urls),
+            'stopped': stopped_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/config/<int:config_id>/running-status', methods=['GET'])
+@login_required
+def get_config_running_status(config_id):
+    """获取配置的详细运行状态"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(config_id=config_id, is_active=True).all()
+
+        running_urls = []
+        completed_urls = []
+        pending_urls = []
+
+        for url in urls:
+            url_data = url.to_dict()
+            if url.is_running:
+                running_urls.append(url_data)
+            elif url.current_count >= url.max_num:
+                completed_urls.append(url_data)
+            else:
+                pending_urls.append(url_data)
+
+        return jsonify({
+            'config_id': config_id,
+            'config_name': config.message,
+            'summary': {
+                'total': len(urls),
+                'running': len(running_urls),
+                'completed': len(completed_urls),
+                'pending': len(pending_urls),
+                'total_running_time': sum(url.get_running_duration() for url in urls if url.is_running)
+            },
+            'details': {
+                'running_urls': running_urls,
+                'completed_urls': completed_urls,
+                'pending_urls': pending_urls
+            }
+        })
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500

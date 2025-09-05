@@ -44,7 +44,6 @@ let currentEditingUrlId = null;
 let currentEditingMachineId = null;
 let currentConfigId = null;
 let currentConfigData = null;
-let systemRunningMap = new Map();
 let monitoringInterval = null;
 let lastUpdateTime = Date.now();
 let availableMachines = [];
@@ -68,14 +67,12 @@ async function loadMachineList() {
         machines.forEach(machine => {
             const option = document.createElement('option');
             option.value = machine.id;
-            // 显示格式：机器名称 + pade_code
             const machineName = machine.name || '未命名';
             const machineCode = machine.pade_code || '无代码';
             option.textContent = `${machineName} (${machineCode})`;
             select.appendChild(option);
         });
 
-        // 如果没有选中的机器，默认选择第一台
         if (!currentConfigId && machines.length > 0) {
             currentConfigId = machines[0].id;
             select.value = currentConfigId;
@@ -107,7 +104,6 @@ function switchMachine() {
 
     if (newConfigId && newConfigId !== currentConfigId) {
         currentConfigId = newConfigId;
-        systemRunningMap.clear(); // 清除运行状态
         updateCurrentMachineInfo();
         loadDashboardData().then(r => {});
     }
@@ -188,15 +184,17 @@ function updateUrlList(urls) {
     }
 
     urlList.innerHTML = urls.map(url => {
-        const isSystemRunning = systemRunningMap.get(url.id) || false;
         const progressPercent = (url.current_count / url.max_num) * 100;
-
-        let statusButton = getStatusButton(url, isSystemRunning);
+        let statusButton = getStatusButton(url);
+        let runningInfo = getRunningInfo(url);
 
         return `
             <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''}">
                 <div class="url-info">
-                    <div class="url-name">${url.name}</div>
+                    <div class="url-name">
+                        ${url.name}
+                        ${runningInfo}
+                    </div>
                     <div class="url-link">${url.url}</div>
                     <div class="url-meta">
                         <small>
@@ -205,6 +203,7 @@ function updateUrlList(urls) {
                             当前: ${url.current_count} | 
                             状态: ${url.is_active ? '激活' : '禁用'}
                             ${url.Last_time ? ' | 最后执行: ' + new Date(url.Last_time).toLocaleString() : ''}
+                            ${getRunningDurationInfo(url)}
                         </small>
                     </div>
                 </div>
@@ -216,6 +215,7 @@ function updateUrlList(urls) {
                     </div>
                     <div class="url-actions">
                         ${statusButton}
+                        ${getControlButtons(url)}
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
                         <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
@@ -226,13 +226,59 @@ function updateUrlList(urls) {
     }).join('');
 }
 
-function getStatusButton(url, isSystemRunning) {
+function getStatusButton(url) {
     if (!url.can_execute) {
         return `<span class="btn btn-success btn-sm">✓ 已完成</span>`;
-    } else if (isSystemRunning) {
+    } else if (url.is_running) {
         return `<span class="btn btn-primary btn-sm">🔄 运行中</span>`;
     } else {
         return `<span class="btn btn-secondary btn-sm">⏸ 等待中</span>`;
+    }
+}
+
+function getRunningInfo(url) {
+    if (url.is_running) {
+        return `<span class="execution-status status-executing">运行中</span>`;
+    } else if (url.current_count >= url.max_num) {
+        return `<span class="execution-status status-completed">已完成</span>`;
+    } else if (url.stopped_at) {
+        return `<span class="execution-status status-pending">已停止</span>`;
+    } else {
+        return `<span class="execution-status status-pending">等待中</span>`;
+    }
+}
+
+function getRunningDurationInfo(url) {
+    if (!url.started_at || !url.running_duration) {
+        return '';
+    }
+
+    if (url.running_duration > 0) {
+        const hours = Math.floor(url.running_duration / 3600);
+        const minutes = Math.floor((url.running_duration % 3600) / 60);
+        const seconds = url.running_duration % 60;
+
+        let duration = '';
+        if (hours > 0) duration += `${hours}时`;
+        if (minutes > 0) duration += `${minutes}分`;
+        duration += `${seconds}秒`;
+
+        const statusText = url.is_running ? '运行时长' : '运行了';
+        return ` | ${statusText}: ${duration}`;
+    }
+
+    return '';
+}
+
+function getControlButtons(url) {
+    if (!url.can_execute) {
+        return '';
+    }
+
+    if (url.is_running) {
+        return `<button class="btn btn-warning btn-sm" onclick="stopUrl(${url.id}, '${url.name}')">停止</button>`;
+    } else {
+        return `<button class="btn btn-success btn-sm" onclick="startUrl(${url.id}, '${url.name}')">启动</button>`;
     }
 }
 
@@ -240,6 +286,35 @@ function updatePageTitle() {
     const time = new Date(lastUpdateTime).toLocaleTimeString();
     const machineName = currentConfigData ? (currentConfigData.name || currentConfigData.pade_code) : '未选择';
     document.title = `消息管理系统 - ${machineName} (${time})`;
+}
+
+// ================================
+// URL运行控制功能
+// ================================
+async function startUrl(urlId, urlName) {
+    try {
+        const result = await apiCall(`/api/url/${urlId}/start`, {
+            method: 'POST'
+        });
+
+        console.log(`URL "${urlName}" 启动成功:`, result);
+        await loadDashboardData();
+    } catch (error) {
+        console.error(`启动URL "${urlName}" 失败:`, error);
+    }
+}
+
+async function stopUrl(urlId, urlName) {
+    try {
+        const result = await apiCall(`/api/url/${urlId}/stop`, {
+            method: 'POST'
+        });
+
+        console.log(`URL "${urlName}" 停止成功:`, result);
+        await loadDashboardData();
+    } catch (error) {
+        console.error(`停止URL "${urlName}" 失败:`, error);
+    }
 }
 
 // ================================
@@ -292,7 +367,7 @@ async function saveEditedUrl(event) {
     };
 
     try {
-        const result = await apiCall(`/api/url/${currentEditingUrlId}`, {
+        await apiCall(`/api/url/${currentEditingUrlId}`, {
             method: 'PUT',
             body: JSON.stringify(data)
         });
@@ -337,7 +412,7 @@ async function addUrl(event) {
     };
 
     try {
-        const result = await apiCall('/api/url', {
+        await apiCall('/api/url', {
             method: 'POST',
             body: JSON.stringify(data)
         });
@@ -360,7 +435,7 @@ async function deleteUrl(urlId, urlName) {
     }
 
     try {
-        const result = await apiCall(`/api/url/${urlId}`, {
+        await apiCall(`/api/url/${urlId}`, {
             method: 'DELETE'
         });
 
@@ -375,16 +450,15 @@ async function deleteUrl(urlId, urlName) {
 // 重置功能
 // ================================
 async function resetUrlCount(urlId, urlName) {
-    if (!confirm(`确定要重置URL "${urlName}" 的执行计数吗？`)) {
+    if (!confirm(`确定要重置URL "${urlName}" 的执行计数吗？这将同时停止其运行状态。`)) {
         return;
     }
 
     try {
-        const result = await apiCall(`/api/url/${urlId}/reset`, {
+        await apiCall(`/api/url/${urlId}/reset`, {
             method: 'POST'
         });
 
-        systemRunningMap.delete(urlId);
         alert('URL计数重置成功!');
         await loadDashboardData();
     } catch (error) {
@@ -398,11 +472,10 @@ async function resetAllUrls() {
         return;
     }
 
-    if (!confirm('确定要重置当前机器所有URL的执行计数吗？')) return;
+    if (!confirm('确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。')) return;
 
     try {
         const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
-        systemRunningMap.clear();
         alert(result.message);
         await loadDashboardData();
     } catch (error) {
@@ -423,14 +496,6 @@ async function startCurrentMachine() {
         const result = await apiCall(`/api/start`, {
             method: 'POST',
             body: JSON.stringify({ pade_code: currentConfigData.pade_code })
-        });
-
-        // 标记所有可用URL为运行状态
-        const urlsData = await apiCall(`/api/config/${currentConfigId}/urls`);
-        urlsData.urls.forEach(url => {
-            if (url.can_execute && url.is_active) {
-                systemRunningMap.set(url.id, true);
-            }
         });
 
         console.log('启动成功:', result);
@@ -454,7 +519,6 @@ async function stopCurrentMachine() {
             body: JSON.stringify({ pade_code: currentConfigData.pade_code })
         });
 
-        systemRunningMap.clear();
         console.log('停止成功:', result);
         await loadDashboardData();
         alert('当前机器停止成功!');
@@ -522,7 +586,6 @@ async function stopAllMachines() {
         }
     }
 
-    systemRunningMap.clear();
     alert(`批量停止完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
     await loadDashboardData();
 }
@@ -532,34 +595,29 @@ async function stopAllMachines() {
 // ================================
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
-    loadMachineManagementList().then(r => {});
+    loadMachineManagementList();
 }
 
 function hideMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'none';
 }
 
-// 显示编辑机器模态框
 function showEditMachineModal() {
     document.getElementById('editMachineModal').style.display = 'block';
 }
 
-// 隐藏编辑机器模态框
 function hideEditMachineModal() {
     document.getElementById('editMachineModal').style.display = 'none';
     currentEditingMachineId = null;
 }
 
-// 编辑机器
 async function editMachine(machineId) {
     try {
-        // 获取机器信息
         const response = await apiCall(`/api/machines/${machineId}`);
         const machine = response.machine;
 
         currentEditingMachineId = machineId;
 
-        // 填充编辑表单
         document.getElementById('editMachineId').value = machine.id;
         document.getElementById('editMachineName').value = machine.name || '';
         document.getElementById('editMachineMessage').value = machine.message || '';
@@ -577,7 +635,6 @@ async function editMachine(machineId) {
     }
 }
 
-// 保存编辑的机器
 async function saveEditedMachine(event) {
     event.preventDefault();
 
@@ -598,7 +655,7 @@ async function saveEditedMachine(event) {
     };
 
     try {
-        const result = await apiCall(`/api/machines/${currentEditingMachineId}`, {
+        await apiCall(`/api/machines/${currentEditingMachineId}`, {
             method: 'PUT',
             body: JSON.stringify(data)
         });
@@ -613,14 +670,11 @@ async function saveEditedMachine(event) {
     }
 }
 
-// 编辑当前选中的机器
 async function editCurrentMachine() {
     if (!currentConfigId) {
         alert('请先选择一台机器');
         return;
     }
-
-    // 直接调用编辑机器功能
     await editMachine(currentConfigId);
 }
 
@@ -709,7 +763,6 @@ async function deleteMachine(machineId, machineName) {
 
         alert(result.message);
 
-        // 如果删除的是当前选中的机器，重置选择
         if (currentConfigId === machineId) {
             currentConfigId = null;
             currentConfigData = null;
@@ -733,7 +786,7 @@ function startMonitoring(intervalMs = 5000) {
     console.log(`开始实时监控，刷新间隔: ${intervalMs}ms`);
 
     monitoringInterval = setInterval(async () => {
-        if (document.hidden || !currentConfigId) return; // 页面隐藏或未选择机器时不刷新
+        if (document.hidden || !currentConfigId) return;
 
         try {
             await loadDashboardData();
@@ -768,26 +821,21 @@ function refreshData() {
 // 页面初始化
 // ================================
 document.addEventListener('DOMContentLoaded', async () => {
-    // 初始加载机器列表
     await loadMachineList();
 
-    // 如果有机器可用，加载第一台机器的数据
     if (currentConfigId) {
         await loadDashboardData();
     }
 
-    // 启动实时监控
-    startMonitoring(5000); // 5秒刷新一次
+    startMonitoring(5000);
 
-    // 页面可见性变化处理
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && currentConfigId) {
-            loadDashboardData(); // 页面显示时立即刷新
+            loadDashboardData();
         }
     });
 });
 
-// 页面卸载时清理
 window.addEventListener('beforeunload', () => {
     stopMonitoring();
 });
