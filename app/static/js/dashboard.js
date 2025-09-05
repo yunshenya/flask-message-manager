@@ -1,4 +1,4 @@
-// 改进版仪表板 - 保留所有编辑功能
+// 多机器仪表板管理系统
 const API_BASE = '';
 
 async function apiCall(url, options = {}) {
@@ -29,19 +29,110 @@ async function apiCall(url, options = {}) {
 
 // 全局变量
 let currentEditingUrlId = null;
+let currentConfigId = null;
 let currentConfigData = null;
 let systemRunningMap = new Map();
 let monitoringInterval = null;
 let lastUpdateTime = Date.now();
+let availableMachines = [];
+
+// ================================
+// 机器管理功能
+// ================================
+async function loadMachineList() {
+    try {
+        const machines = await apiCall('/api/machines');
+        availableMachines = machines;
+
+        const select = document.getElementById('machineSelect');
+        select.innerHTML = '';
+
+        if (machines.length === 0) {
+            select.innerHTML = '<option value="">无可用机器</option>';
+            return;
+        }
+
+        machines.forEach(machine => {
+            const option = document.createElement('option');
+            option.value = machine.id;
+            option.textContent = `${machine.message} (${machine.pade_code})`;
+            select.appendChild(option);
+        });
+
+        // 如果没有选中的机器，默认选择第一台
+        if (!currentConfigId && machines.length > 0) {
+            currentConfigId = machines[0].id;
+            select.value = currentConfigId;
+            updateCurrentMachineInfo();
+        }
+
+    } catch (error) {
+        console.error('加载机器列表失败:', error);
+        document.getElementById('machineSelect').innerHTML = '<option value="">加载失败</option>';
+    }
+}
+
+async function refreshMachineList() {
+    const refreshIcon = document.getElementById('refreshIcon');
+    refreshIcon.classList.add('loading-indicator');
+    refreshIcon.textContent = '';
+
+    try {
+        await loadMachineList();
+    } finally {
+        refreshIcon.classList.remove('loading-indicator');
+        refreshIcon.textContent = '🔄';
+    }
+}
+
+function switchMachine() {
+    const select = document.getElementById('machineSelect');
+    const newConfigId = parseInt(select.value);
+
+    if (newConfigId && newConfigId !== currentConfigId) {
+        currentConfigId = newConfigId;
+        systemRunningMap.clear(); // 清除运行状态
+        updateCurrentMachineInfo();
+        loadDashboardData();
+    }
+}
+
+function updateCurrentMachineInfo() {
+    const infoDiv = document.getElementById('currentMachineInfo');
+    const nameSpan = document.getElementById('currentMachineName');
+    const statusSpan = document.getElementById('currentMachineStatus');
+    const codeSpan = document.getElementById('currentMachineCode');
+
+    if (!currentConfigId || !availableMachines.length) {
+        infoDiv.style.display = 'none';
+        return;
+    }
+
+    const machine = availableMachines.find(m => m.id === currentConfigId);
+    if (machine) {
+        nameSpan.textContent = machine.message || '未命名机器';
+        codeSpan.textContent = machine.pade_code || '无代码';
+        statusSpan.textContent = machine.is_active ? '激活' : '禁用';
+        statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
+        infoDiv.style.display = 'flex';
+    } else {
+        infoDiv.style.display = 'none';
+    }
+}
 
 // ================================
 // 数据加载和状态监控
 // ================================
 async function loadDashboardData() {
+    if (!currentConfigId) {
+        console.warn('没有选中的机器');
+        return;
+    }
+
     try {
         const [statusData, urlsData] = await Promise.all([
-            apiCall('/api/config/1/status'),
-            apiCall('/api/config/1/urls')
+            apiCall(`/api/config/${currentConfigId}/status`),
+            apiCall(`/api/config/${currentConfigId}/urls`)
         ]);
 
         currentConfigData = statusData.config;
@@ -73,11 +164,15 @@ function updateUrlList(urls) {
     const urlList = document.getElementById('urlList');
     if (!urlList) return;
 
+    if (urls.length === 0) {
+        urlList.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">当前机器暂无URL配置</div>';
+        return;
+    }
+
     urlList.innerHTML = urls.map(url => {
         const isSystemRunning = systemRunningMap.get(url.id) || false;
         const progressPercent = (url.current_count / url.max_num) * 100;
 
-        // 基于数据库状态显示按钮
         let statusButton = getStatusButton(url, isSystemRunning);
 
         return `
@@ -125,7 +220,8 @@ function getStatusButton(url, isSystemRunning) {
 
 function updatePageTitle() {
     const time = new Date(lastUpdateTime).toLocaleTimeString();
-    document.title = `消息管理系统 (${time})`;
+    const machineName = currentConfigData ? currentConfigData.message : '未选择';
+    document.title = `消息管理系统 - ${machineName} (${time})`;
 }
 
 // ================================
@@ -195,6 +291,10 @@ async function saveEditedUrl(event) {
 // URL添加功能
 // ================================
 function showAddUrlModal() {
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
     document.getElementById('addUrlModal').style.display = 'block';
 }
 
@@ -205,8 +305,13 @@ function hideAddUrlModal() {
 async function addUrl(event) {
     event.preventDefault();
 
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
+
     const data = {
-        config_id: 1,
+        config_id: currentConfigId,
         url: document.getElementById('newUrl').value,
         name: document.getElementById('newName').value,
         duration: parseInt(document.getElementById('newDuration').value),
@@ -270,10 +375,15 @@ async function resetUrlCount(urlId, urlName) {
 }
 
 async function resetAllUrls() {
-    if (!confirm('确定要重置所有URL的执行计数吗？')) return;
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
+
+    if (!confirm('确定要重置当前机器所有URL的执行计数吗？')) return;
 
     try {
-        const result = await apiCall('/api/config/1/reset', { method: 'POST' });
+        const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
         systemRunningMap.clear();
         alert(result.message);
         await loadDashboardData();
@@ -285,21 +395,20 @@ async function resetAllUrls() {
 // ================================
 // 机器控制功能
 // ================================
-async function startMachine(padeCode = null) {
-    const code = padeCode || (currentConfigData ? currentConfigData.pade_code : null);
-    if (!code) {
-        alert('请提供 pade_code 参数');
+async function startCurrentMachine() {
+    if (!currentConfigData || !currentConfigData.pade_code) {
+        alert('当前机器没有配置代码');
         return;
     }
 
     try {
         const result = await apiCall(`/api/start`, {
             method: 'POST',
-            body: JSON.stringify({ pade_code: code })
+            body: JSON.stringify({ pade_code: currentConfigData.pade_code })
         });
 
         // 标记所有可用URL为运行状态
-        const urlsData = await apiCall('/api/config/1/urls');
+        const urlsData = await apiCall(`/api/config/${currentConfigId}/urls`);
         urlsData.urls.forEach(url => {
             if (url.can_execute && url.is_active) {
                 systemRunningMap.set(url.id, true);
@@ -308,67 +417,219 @@ async function startMachine(padeCode = null) {
 
         console.log('启动成功:', result);
         await loadDashboardData();
-        alert('机器启动成功!');
+        alert('当前机器启动成功!');
     } catch (error) {
         console.error('启动失败:', error);
-        alert('机器启动失败');
+        alert('当前机器启动失败');
     }
 }
 
-async function stopMachine(padeCode = null) {
-    const code = padeCode || (currentConfigData ? currentConfigData.pade_code : null);
-    if (!code) {
-        alert('请提供 pade_code 参数');
+async function stopCurrentMachine() {
+    if (!currentConfigData || !currentConfigData.pade_code) {
+        alert('当前机器没有配置代码');
         return;
     }
 
     try {
         const result = await apiCall(`/api/stop`, {
             method: 'POST',
-            body: JSON.stringify({ pade_code: code })
+            body: JSON.stringify({ pade_code: currentConfigData.pade_code })
         });
 
         systemRunningMap.clear();
         console.log('停止成功:', result);
         await loadDashboardData();
-        alert('机器停止成功!');
+        alert('当前机器停止成功!');
     } catch (error) {
         console.error('停止失败:', error);
-        alert('机器停止失败');
+        alert('当前机器停止失败');
     }
 }
 
 async function startAllMachines() {
-    if (!currentConfigData || !currentConfigData.pade_code) {
-        alert('没有找到机器配置信息');
+    if (!availableMachines.length) {
+        alert('没有可用的机器');
         return;
     }
 
-    if (!confirm('确定要启动机器吗？')) {
+    if (!confirm('确定要启动所有机器吗？')) {
         return;
     }
 
-    try {
-        await startMachine(currentConfigData.pade_code);
-    } catch (error) {
-        console.error('启动机器失败:', error);
-        alert('启动机器失败，请检查网络连接和配置');
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const machine of availableMachines) {
+        if (!machine.pade_code || !machine.is_active) continue;
+
+        try {
+            await apiCall(`/api/start`, {
+                method: 'POST',
+                body: JSON.stringify({ pade_code: machine.pade_code })
+            });
+            successCount++;
+        } catch (error) {
+            console.error(`启动机器 ${machine.message} 失败:`, error);
+            failCount++;
+        }
     }
+
+    alert(`批量启动完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
+    await loadDashboardData();
 }
 
 async function stopAllMachines() {
-    if (!currentConfigData || !currentConfigData.pade_code) {
-        alert('没有找到机器配置信息');
+    if (!availableMachines.length) {
+        alert('没有可用的机器');
         return;
     }
 
-    if (!confirm('确定要停止机器吗？')) return;
+    if (!confirm('确定要停止所有机器吗？')) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const machine of availableMachines) {
+        if (!machine.pade_code) continue;
+
+        try {
+            await apiCall(`/api/stop`, {
+                method: 'POST',
+                body: JSON.stringify({ pade_code: machine.pade_code })
+            });
+            successCount++;
+        } catch (error) {
+            console.error(`停止机器 ${machine.message} 失败:`, error);
+            failCount++;
+        }
+    }
+
+    systemRunningMap.clear();
+    alert(`批量停止完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
+    await loadDashboardData();
+}
+
+// ================================
+// 机器管理功能
+// ================================
+function showMachineManagement() {
+    document.getElementById('machineManagementModal').style.display = 'block';
+    loadMachineManagementList();
+}
+
+function hideMachineManagement() {
+    document.getElementById('machineManagementModal').style.display = 'none';
+}
+
+async function loadMachineManagementList() {
+    try {
+        const machines = await apiCall('/api/machines');
+        const listDiv = document.getElementById('machineList');
+
+        if (machines.length === 0) {
+            listDiv.innerHTML = '<p>暂无机器配置</p>';
+            return;
+        }
+
+        listDiv.innerHTML = `
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #f8f9fa;">
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">ID</th>
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">名称</th>
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">代码</th>
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">状态</th>
+                        <th style="padding: 0.5rem; border: 1px solid #ddd;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${machines.map(machine => `
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.message}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                                <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${machine.is_active ? '激活' : '禁用'}
+                                </span>
+                            </td>
+                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                                <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
+                                    ${machine.is_active ? '禁用' : '激活'}
+                                </button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${machine.message}')">删除</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('加载机器管理列表失败:', error);
+    }
+}
+
+async function addMachine(event) {
+    event.preventDefault();
+
+    const data = {
+        message: document.getElementById('newMachineName').value,
+        pade_code: document.getElementById('newMachineCode').value,
+        description: document.getElementById('newMachineDesc').value
+    };
 
     try {
-        await stopMachine(currentConfigData.pade_code);
+        const result = await apiCall('/api/machines', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+
+        alert('机器添加成功!');
+        document.querySelector('#machineManagementModal form').reset();
+        await loadMachineManagementList();
+        await loadMachineList();
     } catch (error) {
-        console.error('停止机器失败:', error);
-        alert('机器停止失败');
+        // 错误已在apiCall中处理
+    }
+}
+
+async function toggleMachine(machineId) {
+    try {
+        const result = await apiCall(`/api/machines/${machineId}/toggle`, {
+            method: 'POST'
+        });
+
+        alert(result.message);
+        await loadMachineManagementList();
+        await loadMachineList();
+        updateCurrentMachineInfo();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function deleteMachine(machineId, machineName) {
+    if (!confirm(`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！`)) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/machines/${machineId}`, {
+            method: 'DELETE'
+        });
+
+        alert(result.message);
+
+        // 如果删除的是当前选中的机器，重置选择
+        if (currentConfigId === machineId) {
+            currentConfigId = null;
+            currentConfigData = null;
+        }
+
+        await loadMachineManagementList();
+        await loadMachineList();
+    } catch (error) {
+        // 错误已在apiCall中处理
     }
 }
 
@@ -383,7 +644,7 @@ function startMonitoring(intervalMs = 5000) {
     console.log(`开始实时监控，刷新间隔: ${intervalMs}ms`);
 
     monitoringInterval = setInterval(async () => {
-        if (document.hidden) return; // 页面隐藏时不刷新
+        if (document.hidden || !currentConfigId) return; // 页面隐藏或未选择机器时不刷新
 
         try {
             await loadDashboardData();
@@ -402,6 +663,11 @@ function stopMonitoring() {
 }
 
 function refreshData() {
+    if (!currentConfigId) {
+        alert('请先选择一台机器');
+        return;
+    }
+
     loadDashboardData().then(() => {
         alert("数据刷新完成");
     }).catch(error => {
@@ -412,17 +678,22 @@ function refreshData() {
 // ================================
 // 页面初始化
 // ================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 初始加载
-    loadDashboardData().then(r => {});
+document.addEventListener('DOMContentLoaded', async () => {
+    // 初始加载机器列表
+    await loadMachineList();
+
+    // 如果有机器可用，加载第一台机器的数据
+    if (currentConfigId) {
+        await loadDashboardData();
+    }
 
     // 启动实时监控
     startMonitoring(5000); // 5秒刷新一次
 
     // 页面可见性变化处理
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-            loadDashboardData().then(r => {}); // 页面显示时立即刷新
+        if (!document.hidden && currentConfigId) {
+            loadDashboardData(); // 页面显示时立即刷新
         }
     });
 });

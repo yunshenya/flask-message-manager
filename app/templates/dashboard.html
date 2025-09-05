@@ -10,6 +10,47 @@
         .header h1 { margin: 0; }
         .user-info { display: flex; align-items: center; gap: 1rem; }
         .container { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+
+        /* 机器选择器样式 */
+        .machine-selector {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+        .machine-selector h3 { margin: 0; color: #333; }
+        .machine-select-group { display: flex; align-items: center; gap: 1rem; }
+        .machine-select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            min-width: 200px;
+        }
+        .machine-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.5rem 1rem;
+            background: #e3f2fd;
+            border-radius: 4px;
+            border-left: 4px solid #2196f3;
+        }
+        .machine-status {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: bold;
+        }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-inactive { background: #f8d7da; color: #721c24; }
+
         .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
         .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
         .stat-number { font-size: 2rem; font-weight: bold; color: #007bff; }
@@ -57,6 +98,23 @@
         .status-executing { background: #fff3cd; color: #856404; }
         .status-completed { background: #d4edda; color: #155724; }
         .status-failed { background: #f8d7da; color: #721c24; }
+
+        /* 加载状态 */
+        .loading { opacity: 0.6; pointer-events: none; }
+        .loading-indicator {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -77,6 +135,29 @@
     {% endfor %}
     {% endif %}
     {% endwith %}
+
+    <!-- 机器选择器 -->
+    <div class="machine-selector">
+        <h3>🖥️ 机器管理</h3>
+        <div class="machine-select-group">
+            <label for="machineSelect">选择机器:</label>
+            <select id="machineSelect" class="machine-select" onchange="switchMachine()">
+                <option value="">加载中...</option>
+            </select>
+            <button class="btn btn-info btn-sm" onclick="refreshMachineList()">
+                <span id="refreshIcon">🔄</span> 刷新
+            </button>
+        </div>
+        <div class="machine-info" id="currentMachineInfo" style="display: none;">
+            <div>
+                <strong id="currentMachineName">-</strong>
+                <span class="machine-status" id="currentMachineStatus">未知</span>
+            </div>
+            <div>
+                <small>代码: <span id="currentMachineCode">-</span></small>
+            </div>
+        </div>
+    </div>
 
     <div class="stats">
         <div class="stat-card">
@@ -105,12 +186,19 @@
             <a href="#" onclick="resetAllUrls()" class="btn btn-warning">重置所有计数</a>
         </div>
         <div class="action-card">
-            <h3>批量操作</h3>
-            <a href="#" onclick="editUrl()" class="btn btn-success">批量添加</a>
-            <a href="#" onclick="startAllMachines()" class="btn btn-success">启动全部</a>
-            <a href="#" onclick="stopAllMachines()" class="btn btn-danger">停止全部</a>
-            <a href="/admin" class="btn btn-warning">系统管理</a>
+            <h3>机器控制</h3>
+            <a href="#" onclick="startCurrentMachine()" class="btn btn-success">启动当前机器</a>
+            <a href="#" onclick="stopCurrentMachine()" class="btn btn-danger">停止当前机器</a>
+            <a href="#" onclick="startAllMachines()" class="btn btn-success">启动全部机器</a>
+            <a href="#" onclick="stopAllMachines()" class="btn btn-danger">停止全部机器</a>
         </div>
+        {% if current_user.is_admin %}
+        <div class="action-card">
+            <h3>系统管理</h3>
+            <a href="/admin" class="btn btn-warning">用户管理</a>
+            <a href="#" onclick="showMachineManagement()" class="btn btn-info">机器管理</a>
+        </div>
+        {% endif %}
     </div>
 
     <div class="url-list" id="urlList">
@@ -146,6 +234,7 @@
         </form>
     </div>
 </div>
+
 <!-- 编辑URL模态框 -->
 <div id="editUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
@@ -178,6 +267,39 @@
                 <button type="submit" class="btn btn-success">保存</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- 机器管理模态框 -->
+<div id="machineManagementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow-y: auto;">
+        <h3>机器管理</h3>
+        <div style="margin-bottom: 2rem;">
+            <h4>添加新机器</h4>
+            <form onsubmit="addMachine(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: end;">
+                <div>
+                    <label>机器名称:</label>
+                    <input type="text" id="newMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>机器代码:</label>
+                    <input type="text" id="newMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <label>描述:</label>
+                    <input type="text" id="newMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-success">添加机器</button>
+                </div>
+            </form>
+        </div>
+        <div id="machineList">
+            <!-- 机器列表将动态加载 -->
+        </div>
+        <div style="text-align: right; margin-top: 2rem;">
+            <button onclick="hideMachineManagement()" class="btn btn-danger">关闭</button>
+        </div>
     </div>
 </div>
 

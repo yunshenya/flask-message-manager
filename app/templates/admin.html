@@ -6,93 +6,395 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
         .header { background: #dc3545; color: white; padding: 1rem 2rem; margin: -20px -20px 20px; display: flex; justify-content: space-between; align-items: center; }
-        .container { max-width: 1000px; margin: 0 auto; }
+        .container { max-width: 1200px; margin: 0 auto; }
         .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
         .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; margin: 0.25rem; }
         .btn-primary { background: #007bff; color: white; }
         .btn-success { background: #28a745; color: white; }
         .btn-danger { background: #dc3545; color: white; }
         .btn-warning { background: #ffc107; color: black; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
         th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #f8f9fa; }
         .form-group { margin-bottom: 1rem; }
         label { display: block; margin-bottom: 0.5rem; color: #555; }
         input, select { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .tabs { display: flex; border-bottom: 2px solid #dee2e6; margin-bottom: 2rem; }
+        .tab { padding: 1rem 2rem; cursor: pointer; border-bottom: 2px solid transparent; }
+        .tab.active { border-bottom-color: #007bff; color: #007bff; font-weight: bold; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .machine-status { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: bold; }
+        .status-active { background: #d4edda; color: #155724; }
+        .status-inactive { background: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
 <div class="header">
     <h1>系统管理</h1>
-    <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">返回仪表板</a>
+    <div>
+        <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary">返回仪表板</a>
+    </div>
 </div>
 
 <div class="container">
-    <div class="card">
-        <h2>创建用户</h2>
-        <form method="POST" action="{{ url_for('admin.create_user') }}">
-            <div class="form-group">
-                <label>用户名:</label>
-                <input type="text" name="username" required>
-            </div>
-            <div class="form-group">
-                <label>密码:</label>
-                <input type="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label>邮箱:</label>
-                <input type="email" name="email">
-            </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" name="is_admin"> 管理员权限
-                </label>
-            </div>
-            <button type="submit" class="btn btn-success">创建用户</button>
-        </form>
+    <!-- 标签页导航 -->
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('users')">用户管理</div>
+        <div class="tab" onclick="switchTab('machines')">机器管理</div>
     </div>
 
-    <div class="card">
-        <h2>用户管理</h2>
-        <table>
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>用户名</th>
-                <th>邮箱</th>
-                <th>管理员</th>
-                <th>状态</th>
-                <th>最后登录</th>
-                <th>操作</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for user in users %}
-            <tr>
-                <td>{{ user.id }}</td>
-                <td>{{ user.username }}</td>
-                <td>{{ user.email or '-' }}</td>
-                <td>{{ '是' if user.is_admin else '否' }}</td>
-                <td>{{ '激活' if user.is_active else '禁用' }}</td>
-                <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '从未' }}</td>
-                <td>
-                    {% if user.id != session.user_id %}
-                    <a href="{{ url_for('admin.toggle_user_status', user_id=user.id) }}"
-                       class="btn btn-warning">
-                        {{ '禁用' if user.is_active else '激活' }}
-                    </a>
-                    <a href="{{ url_for('admin.delete_user', user_id=user.id) }}"
-                       class="btn btn-danger"
-                       onclick="return confirm('确定删除用户 {{ user.username }} 吗？')">
-                        删除
-                    </a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+    <!-- 用户管理标签页 -->
+    <div id="users-tab" class="tab-content active">
+        <div class="card">
+            <h2>创建用户</h2>
+            <form method="POST" action="{{ url_for('admin.create_user') }}">
+                <div class="form-group">
+                    <label>用户名:</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label>密码:</label>
+                    <input type="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label>邮箱:</label>
+                    <input type="email" name="email">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="is_admin"> 管理员权限
+                    </label>
+                </div>
+                <button type="submit" class="btn btn-success">创建用户</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>用户管理</h2>
+            <table>
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户名</th>
+                    <th>邮箱</th>
+                    <th>管理员</th>
+                    <th>状态</th>
+                    <th>最后登录</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email or '-' }}</td>
+                    <td>{{ '是' if user.is_admin else '否' }}</td>
+                    <td>{{ '激活' if user.is_active else '禁用' }}</td>
+                    <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '从未' }}</td>
+                    <td>
+                        {% if user.id != session.user_id %}
+                        <a href="{{ url_for('admin.toggle_user_status', user_id=user.id) }}"
+                           class="btn btn-warning">
+                            {{ '禁用' if user.is_active else '激活' }}
+                        </a>
+                        <a href="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                           class="btn btn-danger"
+                           onclick="return confirm('确定删除用户 {{ user.username }} 吗？')">
+                            删除
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 机器管理标签页 -->
+    <div id="machines-tab" class="tab-content">
+        <div class="card">
+            <h2>添加新机器</h2>
+            <form onsubmit="addMachine(event)">
+                <div class="form-group">
+                    <label>机器名称:</label>
+                    <input type="text" id="newMachineName" required placeholder="例如: 主要服务器">
+                </div>
+                <div class="form-group">
+                    <label>机器代码:</label>
+                    <input type="text" id="newMachineCode" required placeholder="例如: AC32010960163">
+                </div>
+                <div class="form-group">
+                    <label>描述 (可选):</label>
+                    <input type="text" id="newMachineDesc" placeholder="机器用途描述">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label>成功时间范围 (秒) - 最小值:</label>
+                        <input type="number" id="newSuccessTimeMin" value="5" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>成功时间范围 (秒) - 最大值:</label>
+                        <input type="number" id="newSuccessTimeMax" value="10" min="1">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>重置时间 (小时):</label>
+                    <input type="number" id="newResetTime" value="0" min="0">
+                </div>
+                <button type="submit" class="btn btn-success">添加机器</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>机器列表</h2>
+                <div>
+                    <button onclick="refreshMachines()" class="btn btn-info">刷新列表</button>
+                    <button onclick="batchStartMachines()" class="btn btn-success">批量启动</button>
+                    <button onclick="batchStopMachines()" class="btn btn-danger">批量停止</button>
+                </div>
+            </div>
+            <div id="machinesTable">
+                <p>加载中...</p>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+    // 标签页切换功能
+    function switchTab(tabName) {
+        // 隐藏所有标签页内容
+        const contents = document.querySelectorAll('.tab-content');
+        contents.forEach(content => content.classList.remove('active'));
+
+        // 移除所有标签的活动状态
+        const tabs = document.querySelectorAll('.tab');
+        tabs.forEach(tab => tab.classList.remove('active'));
+
+        // 显示选中的标签页内容
+        document.getElementById(tabName + '-tab').classList.add('active');
+
+        // 设置选中的标签为活动状态
+        event.target.classList.add('active');
+
+        // 如果切换到机器管理，加载机器列表
+        if (tabName === 'machines') {
+            loadMachines();
+        }
+    }
+
+    // API调用辅助函数
+    async function apiCall(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API调用错误:', error);
+            alert('操作失败: ' + error.message);
+            throw error;
+        }
+    }
+
+    // 加载机器列表
+    async function loadMachines() {
+        try {
+            const machines = await apiCall('/api/machines');
+            displayMachines(machines);
+        } catch (error) {
+            document.getElementById('machinesTable').innerHTML = '<p>加载失败</p>';
+        }
+    }
+
+    // 显示机器列表
+    function displayMachines(machines) {
+        const tableDiv = document.getElementById('machinesTable');
+
+        if (machines.length === 0) {
+            tableDiv.innerHTML = '<p>暂无机器配置</p>';
+            return;
+        }
+
+        const tableHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>名称</th>
+                        <th>代码</th>
+                        <th>描述</th>
+                        <th>状态</th>
+                        <th>时间配置</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${machines.map(machine => `
+                        <tr>
+                            <td>${machine.id}</td>
+                            <td>${machine.message}</td>
+                            <td>${machine.pade_code}</td>
+                            <td>${machine.description || '-'}</td>
+                            <td>
+                                <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${machine.is_active ? '激活' : '禁用'}
+                                </span>
+                            </td>
+                            <td>${machine.success_time[0]}-${machine.success_time[1]}秒</td>
+                            <td>${new Date(machine.created_at).toLocaleString()}</td>
+                            <td>
+                                <button class="btn btn-warning" onclick="toggleMachine(${machine.id})">
+                                    ${machine.is_active ? '禁用' : '激活'}
+                                </button>
+                                <button class="btn btn-info" onclick="editMachine(${machine.id})">编辑</button>
+                                <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${machine.message}')">删除</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+
+        tableDiv.innerHTML = tableHTML;
+    }
+
+    // 添加新机器
+    async function addMachine(event) {
+        event.preventDefault();
+
+        const data = {
+            message: document.getElementById('newMachineName').value,
+            pade_code: document.getElementById('newMachineCode').value,
+            description: document.getElementById('newMachineDesc').value,
+            success_time_min: parseInt(document.getElementById('newSuccessTimeMin').value),
+            success_time_max: parseInt(document.getElementById('newSuccessTimeMax').value),
+            reset_time: parseInt(document.getElementById('newResetTime').value)
+        };
+
+        try {
+            const result = await apiCall('/api/machines', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+
+            alert('机器添加成功!');
+            document.querySelector('#machines-tab form').reset();
+            // 重置为默认值
+            document.getElementById('newSuccessTimeMin').value = 5;
+            document.getElementById('newSuccessTimeMax').value = 10;
+            document.getElementById('newResetTime').value = 0;
+            await loadMachines();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
+    // 切换机器状态
+    async function toggleMachine(machineId) {
+        try {
+            const result = await apiCall(`/api/machines/${machineId}/toggle`, {
+                method: 'POST'
+            });
+
+            alert(result.message);
+            await loadMachines();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
+    // 编辑机器 (简化版，可以扩展为完整的编辑表单)
+    async function editMachine(machineId) {
+        const newName = prompt('请输入新的机器名称:');
+        if (!newName || !newName.trim()) return;
+
+        try {
+            const result = await apiCall(`/api/machines/${machineId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ message: newName.trim() })
+            });
+
+            alert('机器名称更新成功!');
+            await loadMachines();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
+    // 删除机器
+    async function deleteMachine(machineId, machineName) {
+        if (!confirm(`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`)) {
+            return;
+        }
+
+        try {
+            const result = await apiCall(`/api/machines/${machineId}`, {
+                method: 'DELETE'
+            });
+
+            alert(result.message);
+            await loadMachines();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
+    // 刷新机器列表
+    async function refreshMachines() {
+        await loadMachines();
+        alert('机器列表已刷新');
+    }
+
+    // 批量启动机器
+    async function batchStartMachines() {
+        if (!confirm('确定要启动所有激活的机器吗？')) return;
+
+        try {
+            const result = await apiCall('/api/machines/batch-start', {
+                method: 'POST',
+                body: JSON.stringify({})
+            });
+
+            alert(result.message);
+            console.log('批量启动结果:', result.results);
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+
+    // 批量停止机器
+    async function batchStopMachines() {
+        if (!confirm('确定要停止所有机器吗？')) return;
+
+        try {
+            const result = await apiCall('/api/machines/batch-stop', {
+                method: 'POST',
+                body: JSON.stringify({})
+            });
+
+            alert(result.message);
+            console.log('批量停止结果:', result.results);
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+</script>
 </body>
 </html>
