@@ -483,7 +483,7 @@ function clearFilter() {
         filterInfo.innerHTML = '';
     }
 
-    loadDashboardData();
+    loadDashboardData().then(r => {});
 }
 
 // ================================
@@ -794,7 +794,7 @@ async function stopAllMachines() {
 // ================================
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
-    loadMachineManagementList();
+    loadMachineManagementList().then(r => {});
 }
 
 function hideMachineManagement() {
@@ -1073,8 +1073,7 @@ function startStatusMonitoring(intervalMs = 2000) {
 
         try {
             // 只获取URL数据进行状态更新，减少API调用
-            const urlsData = await apiCall(`/api/config/${currentConfigId}/urls`);
-            updateAllUrlStatusDisplays(urlsData.urls);
+            await apiCall(`/api/config/${currentConfigId}/urls`);
         } catch (error) {
             console.error('状态监控失败:', error);
         }
@@ -1163,11 +1162,3 @@ window.addEventListener('beforeunload', () => {
     stopMonitoring();
     stopStatusMonitoring();
 });
-
-
-window.debugStatusDisplay = {
-    updateStatus: updateUrlStatusDisplay,
-    testDisplay: testStatusDisplay,
-    startMonitoring: startStatusMonitoring,
-    stopMonitoring: stopStatusMonitoring
-};
