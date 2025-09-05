@@ -15,3 +15,7 @@ def index():
 def dashboard():
     user = db.session.get(User, session['user_id'])
     return render_template('dashboard.html', current_user=user)
+
+@bp.route("/favicon.ico", methods=['GET', 'POST'])
+def favicon():
+    return url_for('static/img', filename='favicon.ico')
