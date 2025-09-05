@@ -26,8 +26,12 @@ async function apiCall(url, options = {}) {
         throw error;
     }
 }
+
 // 编辑URL相关的全局变量
 let currentEditingUrlId = null;
+let currentConfigData = null; // 存储当前配置数据
+let executingUrls = new Set(); // 存储正在执行的URL ID
+let systemRunningMap = new Map(); // 存储每个URL的系统运行状态 urlId -> boolean
 
 // 编辑URL函数
 async function editUrl(urlId) {
@@ -125,6 +129,12 @@ async function resetUrlCount(urlId, urlName) {
             method: 'POST'
         });
 
+        // 从执行中集合移除（如果存在）
+        executingUrls.delete(urlId);
+
+        // 重置系统运行状态
+        systemRunningMap.delete(urlId);
+
         alert('URL计数重置成功!');
         await loadDashboardData(); // 重新加载数据
     } catch (error) {
@@ -139,21 +149,54 @@ async function loadDashboardData() {
             apiCall('/api/config/1/urls')
         ]);
 
-        // 更新统计数据
-        document.getElementById('totalUrls').textContent = statusData.total_urls;
-        document.getElementById('availableUrls').textContent = statusData.available_urls;
-        document.getElementById('totalExecutions').textContent = statusData.total_executions;
-        document.getElementById('completedUrls').textContent = statusData.completed_urls;
+        // 保存配置数据
+        currentConfigData = statusData.config;
+
+        // 安全地更新统计数据
+        const totalUrlsEl = document.getElementById('totalUrls');
+        const availableUrlsEl = document.getElementById('availableUrls');
+        const totalExecutionsEl = document.getElementById('totalExecutions');
+        const completedUrlsEl = document.getElementById('completedUrls');
+
+        if (totalUrlsEl) totalUrlsEl.textContent = statusData.total_urls;
+        if (availableUrlsEl) availableUrlsEl.textContent = statusData.available_urls;
+        if (totalExecutionsEl) totalExecutionsEl.textContent = statusData.total_executions;
+        if (completedUrlsEl) completedUrlsEl.textContent = statusData.completed_urls;
 
         // 更新URL列表
         const urlList = document.getElementById('urlList');
-        urlList.innerHTML = urlsData.urls.map(url => `
+        if (!urlList) {
+            console.error('urlList element not found');
+            return;
+        }
+
+        urlList.innerHTML = urlsData.urls.map(url => {
+            const isExecuting = executingUrls.has(url.id);
+            const isSystemRunning = systemRunningMap.get(url.id) || false;
+
+            let buttonText, buttonClass, buttonDisabled;
+
+            if (isExecuting) {
+                buttonText = '执行中...';
+                buttonClass = 'btn btn-warning btn-sm';
+                buttonDisabled = 'disabled';
+            } else if (isSystemRunning) {
+                buttonText = '已启动';
+                buttonClass = 'btn btn-success btn-sm';
+                buttonDisabled = '';
+            } else {
+                buttonText = '未执行';
+                buttonClass = 'btn btn-secondary btn-sm';
+                buttonDisabled = '';
+            }
+
+            return `
             <div class="url-item">
                 <div class="url-info">
                     <div class="url-name">${url.name}</div>
                     <div class="url-link">${url.url}</div>
                     <div class="url-meta">
-                        <small>持续: ${url.duration}秒 | 最大次数: ${url.max_num} | 状态: ${url.is_active ? '激活' : '禁用'}</small>
+                        <small>持续: ${url.duration}秒 | 最大次数: ${url.max_num} | 当前: ${url.current_count} | 状态: ${url.is_active ? '激活' : '禁用'}</small>
                     </div>
                 </div>
                 <div class="url-stats">
@@ -163,22 +206,65 @@ async function loadDashboardData() {
                     </div>
                     <div class="url-actions">
                         ${url.can_execute ?
-            `<button class="btn btn-primary btn-sm" onclick="executeUrl(${url.id}})">执行</button>` :
-            `<span class="btn btn-warning btn-sm">已完成</span>`
-        }
+                `<button class="${buttonClass}" onclick="executeUrlAndStart(${url.id})" ${buttonDisabled}>${buttonText}</button>` :
+                `<span class="btn btn-info btn-sm">已完成 (${url.current_count}/${url.max_num})</span>`
+            }
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
-                        <button class="btn btn-info btn-sm" onclick="start(${url.pade_code})" >开始</button>
+                        <button class="btn btn-primary btn-sm" onclick="startMachine()" title="启动机器">启动</button>
+                        <button class="btn btn-danger btn-sm" onclick="stopMachine()" title="停止机器">停止</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
+                        <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     } catch (error) {
         console.error('加载数据失败:', error);
     }
 }
 
+// 修改后的执行URL函数，执行后自动启动机器
+async function executeUrlAndStart(urlId) {
+    // 检查是否已经在执行中
+    if (executingUrls.has(urlId)) {
+        console.log(`URL ${urlId} is already executing`);
+        return;
+    }
+
+    try {
+        // 添加到执行中的URL集合
+        executingUrls.add(urlId);
+
+        // 重新渲染按钮状态
+        await loadDashboardData();
+
+        // 先执行URL
+        const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
+
+        // 执行成功后启动机器
+        if (currentConfigData && currentConfigData.pade_code) {
+            await startMachine(currentConfigData.pade_code);
+            // 执行成功且机器启动后，设置系统运行状态为true
+            systemRunningMap.set(urlId, true);
+        } else {
+            alert('警告: 没有找到 pade_code，无法启动机器');
+        }
+
+        alert('执行成功: ' + result.message);
+
+    } catch (error) {
+        console.error('执行失败:', error);
+        // 执行失败，不设置运行状态，按钮将在重新加载数据时恢复为"未执行"
+    } finally {
+        // 无论成功失败，都从执行中集合移除
+        executingUrls.delete(urlId);
+
+        // 重新加载数据
+        await loadDashboardData();
+    }
+}
+
+// 单独的执行URL函数（保留原有功能）
 async function executeUrl(urlId) {
     try {
         const result = await apiCall(`/api/url/${urlId}/execute`, { method: 'POST' });
@@ -194,6 +280,13 @@ async function resetAllUrls() {
 
     try {
         const result = await apiCall('/api/config/1/reset', { method: 'POST' });
+
+        // 清空执行中的URL集合
+        executingUrls.clear();
+
+        // 清空所有系统运行状态
+        systemRunningMap.clear();
+
         alert(result.message);
         await loadDashboardData();
     } catch (error) {
@@ -237,17 +330,17 @@ async function addUrl(event) {
 
 function refreshData() {
     loadDashboardData().then(r => {
-        alert("刷星数据")
+        alert("刷新数据完成");
     });
 }
 
-// 页面加载时初始化数据
-document.addEventListener('DOMContentLoaded', loadDashboardData);
+// 启动机器函数
+async function startMachine(padeCode = null) {
+    // 如果没有传递 padeCode，使用配置中的
+    const code = padeCode || (currentConfigData ? currentConfigData.pade_code : null);
 
-
-async function start(pade_code) {
-    if (!pade_code) {
-        alert('请提供pade_code参数');
+    if (!code) {
+        alert('请提供 pade_code 参数');
         return;
     }
 
@@ -255,15 +348,44 @@ async function start(pade_code) {
         const result = await apiCall(`/api/start`, {
             method: 'POST',
             body: JSON.stringify({
-                pade_code: pade_code  // 发送JSON数据
+                pade_code: code
             })
         });
 
-        alert('启动成功: ' + result.message);
-        isSystemRunning = true;
-        updateSystemControls();
+        alert('启动成功: ' + result.message + ' (设备: ' + code + ')');
         await loadDashboardData();
     } catch (error) {
         console.error('启动失败:', error);
     }
 }
+
+// 停止机器函数
+async function stopMachine(padeCode = null) {
+    // 如果没有传递 padeCode，使用配置中的
+    const code = padeCode || (currentConfigData ? currentConfigData.pade_code : null);
+
+    if (!code) {
+        alert('请提供 pade_code 参数');
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/stop`, {
+            method: 'POST',
+            body: JSON.stringify({
+                pade_code: code
+            })
+        });
+
+        // 停止成功后，清空所有URL的系统运行状态
+        systemRunningMap.clear();
+
+        alert('停止成功: ' + result.message + ' (设备: ' + code + ')');
+        await loadDashboardData();
+    } catch (error) {
+        console.error('停止失败:', error);
+    }
+}
+
+// 页面加载时初始化数据
+document.addEventListener('DOMContentLoaded', loadDashboardData);
