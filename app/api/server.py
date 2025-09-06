@@ -384,7 +384,7 @@ def add_label():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route("/update_status", methods=["POST"])  # 重命名避免与add_label重复
+@bp.route("/update_status", methods=["POST"])
 @token_required
 def update_status():
     """更新URL状态 - 只有后端系统可以调用"""

@@ -238,7 +238,6 @@ function updateDurationDisplay(urlId, runningSeconds) {
 
     let durationElement = urlItem.querySelector('.running-duration');
     if (!durationElement) {
-        // 如果不存在时长显示元素，创建一个
         const metaElement = urlItem.querySelector('.url-meta small');
         if (metaElement) {
             durationElement = document.createElement('span');
@@ -259,12 +258,6 @@ function updateDurationDisplay(urlId, runningSeconds) {
     if (durationElement) {
         const formattedDuration = formatDuration(runningSeconds);
         durationElement.textContent = `运行: ${formattedDuration}`;
-
-        // 添加闪烁效果表示实时更新
-        durationElement.style.background = '#c3e6cb';
-        setTimeout(() => {
-            durationElement.style.background = '#d4edda';
-        }, 200);
     }
 }
 
