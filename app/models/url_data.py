@@ -24,8 +24,8 @@ class UrlData(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.datetime.now())
-    status = db.Column(TEXT, nullable=True, default='')  # 修改为可空，默认空字符串
-    label = db.Column(TEXT, nullable=True, default='')   # 修改为可空，默认空字符串
+    status = db.Column(TEXT, nullable=True, default='')
+    label = db.Column(TEXT, nullable=True, default='')
 
     def to_dict(self):
         return {

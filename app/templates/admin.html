@@ -124,6 +124,9 @@
                 <h2>机器列表</h2>
                 <div>
                     <button onclick="refreshMachines()" class="btn btn-info">刷新列表</button>
+                    <button onclick="showVmosMachinesList()" class="btn btn-warning">📋 查看VMOS机器</button>
+                    <button onclick="syncNewMachines()" class="btn btn-success">🔄 同步新机器</button>
+                    <hr style="margin: 0.5rem 0; border: none;">
                     <button onclick="batchStartMachines()" class="btn btn-success">批量启动</button>
                     <button onclick="batchStopMachines()" class="btn btn-danger">批量停止</button>
                 </div>
@@ -482,6 +485,70 @@
             console.log('批量停止结果:', result.results);
         } catch (error) {
             // 错误已在apiCall中处理
+        }
+    }
+
+    async function syncNewMachines() {
+        if (!confirm('确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。')) {
+            return;
+        }
+
+        try {
+            const result = await apiCall('/api/machines/sync-new', {
+                method: 'POST'
+            });
+
+            if (result.new_machines_count > 0) {
+                alert(`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+                    `现有机器: ${result.existing_machines_count} 台\n` +
+                    `总计机器: ${result.total_machines} 台`);
+
+                console.log('新增机器详情:', result.created_machines);
+
+                // 刷新机器列表
+                await loadMachines();
+            } else {
+                alert(`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+            }
+
+        } catch (error) {
+            console.error('同步新机器失败:', error);
+            alert('同步新机器失败，请检查网络连接或稍后重试');
+        }
+    }
+
+    // 查看VMOS机器列表
+    async function showVmosMachinesList() {
+        try {
+            const result = await apiCall('/api/machines/vmos-list');
+
+            let message = `VMOS机器列表概览:\n\n`;
+            message += `总机器数: ${result.total_vmos_machines}\n`;
+            message += `已存在: ${result.existing_machines_count}\n`;
+            message += `新发现: ${result.new_machines_count}\n\n`;
+
+            if (result.new_machines_count > 0) {
+                message += `新发现的机器:\n`;
+                result.new_machines.forEach((machine, index) => {
+                    if (index < 5) { // 只显示前5台，避免弹窗过长
+                        message += `- ${machine.padCode} (${machine.padName || '未命名'})\n`;
+                    }
+                });
+                if (result.new_machines_count > 5) {
+                    message += `... 还有 ${result.new_machines_count - 5} 台机器\n`;
+                }
+                message += `\n是否要添加这些新机器到系统？`;
+
+                if (confirm(message)) {
+                    await syncNewMachines();
+                }
+            } else {
+                alert(message + '没有发现新机器。');
+            }
+
+        } catch (error) {
+            console.error('获取VMOS机器列表失败:', error);
+            alert('获取VMOS机器列表失败');
         }
     }
 </script>

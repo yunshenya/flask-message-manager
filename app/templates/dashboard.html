@@ -209,6 +209,9 @@
             <!-- 机器列表将动态加载 -->
         </div>
         <div style="text-align: right; margin-top: 2rem;">
+            <hr style="margin: 1rem 0;">
+            <button onclick="showVmosMachinesList()" class="btn btn-danger">📋 查看VMOS机器</button>
+            <button onclick="syncNewMachines()" class="btn btn-danger">🔄 同步新机器</button>
             <button onclick="hideMachineManagement()" class="btn btn-danger">关闭</button>
         </div>
     </div>
@@ -272,7 +275,17 @@
         </form>
     </div>
 </div>
-
+<div id="vmosMachinesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1003;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0;">🖥️ VMOS机器列表</h3>
+            <button onclick="hideVmosMachinesModal()" class="btn btn-secondary btn-sm">✕ 关闭</button>
+        </div>
+        <div id="vmosMachinesContent">
+            <!-- 内容将通过JavaScript动态加载 -->
+        </div>
+    </div>
+</div>
 <script src="../static/js/dashboard.js"></script>
 </body>
 </html>

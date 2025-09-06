@@ -1,9 +1,14 @@
 import datetime
+from typing import Any
+
 from flask import jsonify, request
 from app.api import bp
-from app import db
+from app import db, Config
+from app.models import UrlData
 from app.models.config_data import ConfigData
 from app.auth.decorators import login_required, admin_required
+from app.utils.vmos import get_phone_list
+
 
 @bp.route('/machines', methods=['GET'])
 @login_required
@@ -254,7 +259,7 @@ def batch_stop_machines():
             if machine.pade_code:
                 try:
                     # 调用VMOS API停止机器
-                    response = stop_app([machine.pade_code])
+                    response = stop_app([machine.pade_code], package_name=Config.PKG_NAME)
                     results.append({
                         'machine_id': machine.id,
                         'machine_name': machine.message,
@@ -276,3 +281,143 @@ def batch_stop_machines():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/machines/sync-new', methods=['POST'])
+@admin_required
+def sync_new_machines():
+    """从VMOS API同步新机器"""
+    try:
+        vmos_response = get_phone_list()
+        if not vmos_response or 'data' not in vmos_response:
+            return jsonify({'error': 'Failed to fetch machines from VMOS API'}), 500
+
+        vmos_machines: Any = vmos_response['data']
+
+        existing_codes = set(machine.pade_code for machine in ConfigData.query.all() if machine.pade_code)
+
+        # 找出新机器
+        new_machines = []
+        for vmos_machine in vmos_machines:
+            pade_code = vmos_machine.get('padCode')
+            if pade_code and pade_code not in existing_codes:
+                new_machines.append(vmos_machine)
+
+        if not new_machines:
+            return jsonify({
+                'message': 'No new machines found',
+                'new_machines_count': 0,
+                'existing_machines_count': len(existing_codes)
+            })
+
+        # 默认的Telegram URL配置
+        default_telegram_urls = [
+            {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
+            {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
+            {'url': 'https://t.me/lianheshequ424', 'name': '联合社区', 'duration': 30, 'max_num': 3},
+            {'url': 'https://t.me/make_friends1', 'name': 'make_friends', 'duration': 30, 'max_num': 3}
+        ]
+
+        created_machines = []
+
+        # 创建新机器配置
+        for vmos_machine in new_machines:
+            try:
+                new_machine = ConfigData(
+                    message='哈咯----签到',
+                    pade_code=vmos_machine.get('padCode'),
+                    name=vmos_machine.get('padName', f"Machine-{vmos_machine.get('padCode', 'Unknown')}"),
+                    description=vmos_machine.get('goodName', ''),
+                    success_time_min=5,
+                    success_time_max=10,
+                    reset_time=0,
+                    is_active=True
+                )
+
+                db.session.add(new_machine)
+                db.session.flush()  # 获取生成的ID
+
+                # 为新机器创建默认URL配置
+                for url_data in default_telegram_urls:
+                    url = UrlData(
+                        config_id=new_machine.id,
+                        url=url_data['url'],
+                        name=url_data['name'],
+                        duration=url_data['duration'],
+                        max_num=url_data['max_num'],
+                        is_active=True
+                    )
+                    db.session.add(url)
+
+                created_machines.append({
+                    'id': new_machine.id,
+                    'name': new_machine.name,
+                    'pade_code': new_machine.pade_code,
+                    'description': new_machine.description,
+                    'urls_created': len(default_telegram_urls)
+                })
+
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({
+                    'error': f'Failed to create machine {vmos_machine.get("padCode", "Unknown")}: {str(e)}'
+                }), 500
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Successfully synchronized {len(created_machines)} new machines',
+            'new_machines_count': len(created_machines),
+            'existing_machines_count': len(existing_codes),
+            'created_machines': created_machines,
+            'total_machines': len(existing_codes) + len(created_machines)
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to sync new machines: {str(e)}'}), 500
+
+
+@bp.route('/machines/vmos-list', methods=['GET'])
+@admin_required
+def get_vmos_machines_list():
+    try:
+        vmos_response = get_phone_list()
+        if not vmos_response or 'data' not in vmos_response:
+            return jsonify({'error': 'Failed to fetch machines from VMOS API'}), 500
+
+        vmos_machines: Any = vmos_response['data']
+
+        # 获取现有机器的pade_code列表
+        existing_codes = set(machine.pade_code for machine in ConfigData.query.all() if machine.pade_code)
+
+        # 分类机器
+        existing_machines = []
+        new_machines = []
+
+        for vmos_machine in vmos_machines:
+            pade_code = vmos_machine.get('padCode')
+            machine_info = {
+                'padCode': pade_code,
+                'padName': vmos_machine.get('padName', ''),
+                'goodName': vmos_machine.get('goodName', ''),
+                'status': vmos_machine.get('status', ''),
+                'createTime': vmos_machine.get('createTime', ''),
+                'expireTime': vmos_machine.get('expireTime', ''),
+            }
+
+            if pade_code in existing_codes:
+                existing_machines.append(machine_info)
+            else:
+                new_machines.append(machine_info)
+
+        return jsonify({
+            'total_vmos_machines': len(vmos_machines),
+            'existing_machines_count': len(existing_machines),
+            'new_machines_count': len(new_machines),
+            'existing_machines': existing_machines,
+            'new_machines': new_machines
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get VMOS machines list: {str(e)}'}), 500
