@@ -237,10 +237,17 @@ def stop_url(url_id):
         if not url:
             return jsonify({'error': 'URL not found'}), 404
 
+        # 如果URL已经停止，直接返回成功
+        if not url.is_running:
+            return jsonify({
+                'message': f'URL "{url.name}" already stopped',
+                'url_data': url.to_dict()
+            })
+
         if url.stop_running():
             db.session.commit()
 
-            # 添加 WebSocket 推送
+            # WebSocket 推送
             socketio.emit('url_stopped', {
                 'url_id': url_id,
                 'config_id': url.config_id,
@@ -254,8 +261,8 @@ def stop_url(url_id):
             })
         else:
             return jsonify({
-                'error': 'URL is not running'
-            }), 400
+                'error': 'Failed to stop URL'
+            }), 500
 
     except Exception as e:
         db.session.rollback()

@@ -17,11 +17,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+            // 页面隐藏时停止更新
             stopDurationUpdates();
+            console.log('⏸️ 页面隐藏，停止实时更新');
         } else {
+            // 页面显示时恢复更新并强制刷新
+            console.log('👁️ 页面显示，恢复实时更新');
             if (isWebSocketConnected && currentConfigId) {
                 startDurationUpdates();
-                loadDashboardData();
+                // 强制刷新确保状态同步
+                loadDashboardData().then(() => {
+                    console.log('✅ 状态同步完成');
+                }).catch(error => {
+                    console.error('❌ 状态同步失败:', error);
+                });
+            } else if (currentConfigId) {
+                // 如果WebSocket未连接，也要刷新数据
+                loadDashboardData().then(() => {
+                    console.log('✅ 数据刷新完成（WebSocket未连接）');
+                });
             }
         }
     });
