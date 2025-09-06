@@ -1,3 +1,129 @@
+let socket = null;
+
+// 在 document.addEventListener('DOMContentLoaded') 函数中添加 WebSocket 初始化
+document.addEventListener('DOMContentLoaded', async () => {
+    // 初始化 WebSocket
+    initWebSocket();
+
+    await loadMachineList();
+
+    if (currentConfigId) {
+        await loadDashboardData();
+    }
+
+    // 注释掉原来的轮询 - 这行很重要！
+    // startMonitoring(5000);
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentConfigId) {
+            loadDashboardData();
+        }
+    });
+});
+
+// 添加 WebSocket 初始化函数
+function initWebSocket() {
+    if (typeof io === 'undefined') {
+        console.error('Socket.IO 未加载，请检查是否引入了 socket.io.js');
+        return;
+    }
+
+    socket = io();
+
+    socket.on('connect', function() {
+        console.log('WebSocket 连接成功');
+    });
+
+    socket.on('disconnect', function() {
+        console.log('WebSocket 连接断开');
+    });
+
+    // 监听 URL 执行更新
+    socket.on('url_executed', function(data) {
+        console.log('收到 URL 执行更新:', data);
+        if (data.config_id === currentConfigId) {
+            // 只更新相关的 URL 项目
+            updateSingleUrlItem(data.url_data);
+            // 更新统计数据
+            updateStatsFromSocket();
+        }
+    });
+
+    // 监听状态更新
+    socket.on('status_updated', function(data) {
+        console.log('收到状态更新:', data);
+        if (data.config_id === currentConfigId) {
+            updateUrlStatus(data.url_id, data.status);
+        }
+    });
+
+    // 监听标签更新
+    socket.on('label_updated', function(data) {
+        console.log('收到标签更新:', data);
+        if (data.config_id === currentConfigId) {
+            // 重新加载整个列表以更新标签
+            loadDashboardData();
+        }
+    });
+}
+
+// 添加单个 URL 项目更新函数
+function updateSingleUrlItem(urlData) {
+    const urlItem = document.querySelector(`[data-url-id="${urlData.id}"]`);
+    if (urlItem) {
+        // 更新计数显示
+        const countDisplay = urlItem.querySelector('.count-display');
+        if (countDisplay) {
+            countDisplay.textContent = `${urlData.current_count}/${urlData.max_num}`;
+        }
+
+        // 更新进度条
+        const progressBar = urlItem.querySelector('.progress-bar');
+        if (progressBar) {
+            const progressPercent = (urlData.current_count / urlData.max_num) * 100;
+            progressBar.style.width = `${Math.min(progressPercent, 100)}%`;
+            if (progressPercent >= 100) {
+                progressBar.classList.add('completed');
+            }
+        }
+
+        // 更新状态
+        if (urlData.current_count >= urlData.max_num) {
+            urlItem.classList.add('completed');
+        }
+    }
+}
+
+// 添加状态更新函数
+function updateUrlStatus(urlId, status) {
+    const statusElement = document.getElementById(`status-${urlId}`);
+    if (statusElement) {
+        const contentElement = statusElement.querySelector('.status-content');
+        if (contentElement) {
+            contentElement.textContent = status || '暂无状态信息';
+            contentElement.className = `status-content ${status ? '' : 'empty'}`;
+        }
+
+        // 添加更新动画
+        statusElement.classList.add('updating');
+        setTimeout(() => {
+            statusElement.classList.remove('updating');
+        }, 400);
+    }
+}
+
+// 添加统计数据更新函数
+async function updateStatsFromSocket() {
+    try {
+        const statusData = await apiCall(`/api/config/${currentConfigId}/status`);
+        updateStatistics(statusData);
+    } catch (error) {
+        console.error('更新统计数据失败:', error);
+    }
+}
+
+
+
 // 显示消息详情
 function showMessageDetail(message, machineName) {
     document.getElementById('messageDetailTitle').textContent = `${machineName} - 消息详情`;
@@ -228,12 +354,11 @@ function updateUrlList(urls) {
         let statusButton = getStatusButton(url);
         let runningInfo = getRunningInfo(url);
 
-        // 为有标签的URL添加特殊样式
         const hasLabel = url.label && url.label.trim();
         const labelClass = hasLabel ? 'url-item-labeled' : '';
 
         return `
-            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''} ${url.is_running ? 'running' : ''} ${labelClass}">
+            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''} ${url.is_running ? 'running' : ''} ${labelClass}" data-url-id="${url.id}">
                 <div class="url-info">
                     <div class="url-name">
                         ${url.name}
@@ -242,7 +367,6 @@ function updateUrlList(urls) {
                     </div>
                     <div class="url-link">${url.url}</div>
                     
-                    <!-- 实时状态显示 -->
                     <div class="status-display ${url.status && url.status.trim() ? 'has-status' : 'empty'}" id="status-${url.id}">
                         <div class="status-indicator ${url.is_running ? 'active' : ''}"></div>
                         <div class="status-label">状态</div>

@@ -3,7 +3,7 @@ import datetime
 from flask import jsonify, request
 from loguru import logger
 
-from app import Config, db
+from app import Config, db, socketio
 from app.api import bp
 from app.auth.decorators import login_required, token_required
 from app.models import UrlData, ConfigData
@@ -137,12 +137,19 @@ def add_execute_num():
                 'max_num': url.max_num
             }), 400
 
-        # 如果URL不在运行状态，先启动它
         if not url.is_running:
             url.start_running()
 
         if url.execute():
             db.session.commit()
+
+            # 添加这部分 - 实时推送更新
+            socketio.emit('url_executed', {
+                'url_id': url_id,
+                'config_id': url.config_id,
+                'url_data': url.to_dict()
+            })
+
             return jsonify({
                 'message': f'Successfully executed {url.name}',
                 'url': url.url,
@@ -291,6 +298,14 @@ def add_label():
         url.updated_at = datetime.datetime.now()
         db.session.commit()
 
+        # 添加这部分 - 实时推送标签更新
+        socketio.emit('label_updated', {
+            'url_id': url_id,
+            'config_id': url.config_id,
+            'label': label,
+            'url_data': url.to_dict()
+        })
+
         return jsonify({
             'message': f'URL "{url.name}" label updated successfully',
             'url_data': url.to_dict()
@@ -321,6 +336,14 @@ def update_status():
         url.status = status
         url.updated_at = datetime.datetime.now()
         db.session.commit()
+
+        # 添加这部分 - 实时推送状态更新
+        socketio.emit('status_updated', {
+            'url_id': url_id,
+            'config_id': url.config_id,
+            'status': status,
+            'url_data': url.to_dict()
+        })
 
         return jsonify({
             'message': f'URL "{url.name}" status updated successfully',
