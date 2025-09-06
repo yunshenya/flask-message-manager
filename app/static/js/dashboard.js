@@ -688,7 +688,7 @@ async function startAllMachines() {
         return;
     }
 
-    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'secondary')) {
+    if (!await showConfirm('确认启动', '确定要启动当前的所有机器吗？', 'danger')) {
         return;
     }
 
