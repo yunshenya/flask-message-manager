@@ -16,6 +16,6 @@ def dashboard():
     user = db.session.get(User, session['user_id'])
     return render_template('dashboard.html', current_user=user)
 
-@bp.route("/favicon.ico", methods=['GET', 'POST'])
+@bp.route("/favicon.ico")
 def favicon():
-    return url_for('static', filename='img/favicon.ico')
+    return redirect(url_for('static', filename='img/favicon.ico'), code=301)
