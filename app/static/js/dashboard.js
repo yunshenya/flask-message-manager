@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isWebSocketConnected && currentConfigId) {
                 startDurationUpdates();
                 loadDashboardData();
-                console.log('🔊 页面显示，恢复运行时长更新');
             }
         }
     });
@@ -104,7 +103,7 @@ function setupWebSocketEvents() {
     socket.on('url_executed', function(data) {
         if (data.config_id === currentConfigId) {
             updateSingleUrlItem(data.url_data);
-            updateStatsFromSocket();
+            updateStatsFromSocket().then(r => {});
             updateRunningUrlsCache(data.url_data);
         }
     });
