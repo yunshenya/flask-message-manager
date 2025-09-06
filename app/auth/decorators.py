@@ -49,7 +49,7 @@ def token_required(f):
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
 
-        if token != Config.SECRET_KEY:
+        if token != Config.API_SECRET_TOKEN:
             return jsonify({'error': 'Invalid token'}), 401
         return f(*args, **kwargs)
     return decorated
