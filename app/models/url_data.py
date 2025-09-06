@@ -28,17 +28,11 @@ class UrlData(db.Model):
     label = db.Column(TEXT, nullable=True, default='')   # 修改为可空，默认空字符串
 
     def to_dict(self):
-        # 构建显示名称：如果有label且不为空，则在名称后添加label
-        display_name = self.name
-        if self.label and self.label.strip():
-            display_name = f"{self.name} ({self.label.strip()})"
-
         return {
             'id': self.id,
             'url': self.url,
-            'name': display_name,  # 使用包含label的显示名称
-            'original_name': self.name,  # 保留原始名称
-            'label': self.label or '',  # 确保label不为None
+            'name': self.name,
+            'label': self.label or '',
             'duration': self.duration,
             'Last_time': self.last_time.isoformat() if self.last_time else None,
             'max_num': self.max_num,
@@ -46,12 +40,11 @@ class UrlData(db.Model):
             'is_active': self.is_active,
             'can_execute': self.current_count < self.max_num,
             'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith('https://t.me/') else self.url,
-            # 新增运行状态信息
             'is_running': self.is_running,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'stopped_at': self.stopped_at.isoformat() if self.stopped_at else None,
             'running_duration': self.get_running_duration(),
-            'status': self.status or '',  # 确保status不为None
+            'status': self.status or '',
         }
 
     def can_execute(self):

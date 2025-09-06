@@ -48,6 +48,13 @@ let monitoringInterval = null;
 let lastUpdateTime = Date.now();
 let availableMachines = [];
 
+// 新增：筛选状态管理
+let currentFilter = {
+    type: null, // 'label' 或 null
+    value: null, // 筛选值
+    isActive: false
+};
+
 // ================================
 // 机器管理功能
 // ================================
@@ -104,6 +111,8 @@ function switchMachine() {
 
     if (newConfigId && newConfigId !== currentConfigId) {
         currentConfigId = newConfigId;
+        // 切换机器时清除筛选状态
+        clearFilterInternal();
         updateCurrentMachineInfo();
         loadDashboardData();
     }
@@ -151,7 +160,15 @@ async function loadDashboardData() {
 
         currentConfigData = statusData.config;
         updateStatistics(statusData);
-        updateUrlList(urlsData.urls);
+
+        // 根据当前筛选状态决定显示哪些URL
+        if (currentFilter.isActive && currentFilter.type === 'label') {
+            // 如果有筛选状态，应用筛选
+            await applyCurrentFilter();
+        } else {
+            // 没有筛选，显示所有URL
+            updateUrlList(urlsData.urls);
+        }
 
         // 加载标签统计
         await loadLabelStats();
@@ -161,6 +178,22 @@ async function loadDashboardData() {
 
     } catch (error) {
         console.error('加载数据失败:', error);
+    }
+}
+
+// 新增：应用当前筛选
+async function applyCurrentFilter() {
+    if (!currentFilter.isActive || !currentFilter.value) {
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/api/urls/by-label/${encodeURIComponent(currentFilter.value)}?config_id=${currentConfigId}`);
+        updateUrlList(response.urls);
+    } catch (error) {
+        console.error('应用筛选失败:', error);
+        // 如果筛选失败，清除筛选状态
+        clearFilterInternal();
     }
 }
 
@@ -183,7 +216,10 @@ function updateUrlList(urls) {
     if (!urlList) return;
 
     if (urls.length === 0) {
-        urlList.innerHTML = '<div style="padding: 2rem; text-align: center; color: #666;">当前机器暂无URL配置</div>';
+        const emptyMessage = currentFilter.isActive
+            ? `没有找到标签为 "${currentFilter.value}" 的URL`
+            : '当前机器暂无URL配置';
+        urlList.innerHTML = `<div style="padding: 2rem; text-align: center; color: #666;">${emptyMessage}</div>`;
         return;
     }
 
@@ -363,6 +399,11 @@ async function filterByLabel(label) {
     try {
         const response = await apiCall(`/api/urls/by-label/${encodeURIComponent(label)}?config_id=${currentConfigId}`);
 
+        // 设置筛选状态
+        currentFilter.type = 'label';
+        currentFilter.value = label;
+        currentFilter.isActive = true;
+
         updateUrlList(response.urls);
 
         const filterInfo = document.getElementById('filterInfo');
@@ -381,12 +422,20 @@ async function filterByLabel(label) {
     }
 }
 
-function clearFilter() {
+// 内部清除筛选函数（不触发数据重新加载）
+function clearFilterInternal() {
+    currentFilter.type = null;
+    currentFilter.value = null;
+    currentFilter.isActive = false;
+
     const filterInfo = document.getElementById('filterInfo');
     if (filterInfo) {
         filterInfo.innerHTML = '';
     }
+}
 
+function clearFilter() {
+    clearFilterInternal();
     loadDashboardData();
 }
 
@@ -431,10 +480,10 @@ async function editUrl(urlId) {
 
         document.getElementById('editUrlId').value = urlData.id;
         document.getElementById('editUrl').value = urlData.url;
-        document.getElementById('editName').value = urlData.original_name || urlData.name;
+        document.getElementById('editName').value = urlData.name;
         document.getElementById('editDuration').value = urlData.duration;
         document.getElementById('editMaxNum').value = urlData.max_num;
-        document.getElementById('editIsActive').checked = urlData.is_active;
+        document.getElementById('editUrlIsActive').checked = urlData.is_active;
         document.getElementById('editLabel').value = urlData.label || '(暂无标签)';
 
         showEditUrlModal();
@@ -466,7 +515,7 @@ async function saveEditedUrl(event) {
         name: document.getElementById('editName').value,
         duration: parseInt(document.getElementById('editDuration').value),
         max_num: parseInt(document.getElementById('editMaxNum').value),
-        is_active: document.getElementById('editIsActive').checked
+        is_active: document.getElementById('editUrlIsActive').checked
     };
 
     try {
@@ -706,11 +755,11 @@ function hideMachineManagement() {
 }
 
 function showEditMachineModal() {
-    document.getElementById('editMachineModal').style.display = 'block';
+    document.getElementById('dashboardEditMachineModal').style.display = 'block';
 }
 
 function hideEditMachineModal() {
-    document.getElementById('editMachineModal').style.display = 'none';
+    document.getElementById('dashboardEditMachineModal').style.display = 'none';
     currentEditingMachineId = null;
 }
 
@@ -721,15 +770,15 @@ async function editMachine(machineId) {
 
         currentEditingMachineId = machineId;
 
-        document.getElementById('editMachineId').value = machine.id;
-        document.getElementById('editMachineName').value = machine.name || '';
-        document.getElementById('editMachineMessage').value = machine.message || '';
-        document.getElementById('editMachineCode').value = machine.pade_code || '';
-        document.getElementById('editMachineDesc').value = machine.description || '';
-        document.getElementById('editSuccessTimeMin').value = machine.success_time[0];
-        document.getElementById('editSuccessTimeMax').value = machine.success_time[1];
-        document.getElementById('editResetTime').value = machine.reset_time;
-        document.getElementById('editIsActive').checked = machine.is_active;
+        document.getElementById('dashboardEditMachineId').value = machine.id;
+        document.getElementById('dashboardEditMachineName').value = machine.name || '';
+        document.getElementById('dashboardEditMachineMessage').value = machine.message || '';
+        document.getElementById('dashboardEditMachineCode').value = machine.pade_code || '';
+        document.getElementById('dashboardEditMachineDesc').value = machine.description || '';
+        document.getElementById('dashboardEditSuccessTimeMin').value = machine.success_time[0];
+        document.getElementById('dashboardEditSuccessTimeMax').value = machine.success_time[1];
+        document.getElementById('dashboardEditResetTime').value = machine.reset_time;
+        document.getElementById('dashboardEditMachineIsActive').checked = machine.is_active;
 
         showEditMachineModal();
     } catch (error) {
@@ -747,14 +796,14 @@ async function saveEditedMachine(event) {
     }
 
     const data = {
-        name: document.getElementById('editMachineName').value,
-        message: document.getElementById('editMachineMessage').value,
-        pade_code: document.getElementById('editMachineCode').value,
-        description: document.getElementById('editMachineDesc').value,
-        success_time_min: parseInt(document.getElementById('editSuccessTimeMin').value),
-        success_time_max: parseInt(document.getElementById('editSuccessTimeMax').value),
-        reset_time: parseInt(document.getElementById('editResetTime').value),
-        is_active: document.getElementById('editIsActive').checked
+        name: document.getElementById('dashboardEditMachineName').value,
+        message: document.getElementById('dashboardEditMachineMessage').value,
+        pade_code: document.getElementById('dashboardEditMachineCode').value,
+        description: document.getElementById('dashboardEditMachineDesc').value,
+        success_time_min: parseInt(document.getElementById('dashboardEditSuccessTimeMin').value),
+        success_time_max: parseInt(document.getElementById('dashboardEditSuccessTimeMax').value),
+        reset_time: parseInt(document.getElementById('dashboardEditResetTime').value),
+        is_active: document.getElementById('dashboardEditMachineIsActive').checked
     };
 
     try {
@@ -892,6 +941,7 @@ function startMonitoring(intervalMs = 5000) {
         if (document.hidden || !currentConfigId) return;
 
         try {
+            // 实时监控时保持筛选状态
             await loadDashboardData();
         } catch (error) {
             console.error('监控刷新失败:', error);
