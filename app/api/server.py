@@ -21,15 +21,16 @@ def callback():
     except (ValueError, TypeError):
         logger.info(f"其他接口回调: {data}")
         return "ok"
+
     handlers = {
-        1000: lambda: print("xxx"),
-        1002: lambda: print("xxx"),
-        1003: lambda: print("xxx"),
-        1004: lambda: print("xxx"),
-        1006: lambda: print("xxx"),
-        1007: lambda: print("xxx"),
-        1009: lambda: print("xxx"),
-        1124: lambda: print("xxx")
+        1000: lambda: logger.info("xxx"),
+        1002: lambda: logger.info("xxx"),
+        1003: lambda: logger.info("xxx"),
+        1004: lambda: logger.info("xxx"),
+        1006: lambda: logger.info("xxx"),
+        1007: lambda: logger.info("xxx"),
+        1009: lambda: logger.info("xxx"),
+        1124: lambda: logger.info("xxx")
     }
 
     handler = handlers.get(task_type)
@@ -327,6 +328,31 @@ def update_status():
         }), 200
     except ValueError:
         return jsonify({'error': 'Invalid url_id format'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/delete_label', methods=['DELETE'])
+@token_required
+def delete_label_token():
+    try:
+        url_id = request.json.get('url_id')
+        url = UrlData.query.filter(UrlData.id == url_id).one()
+
+        if not url:
+            return jsonify({
+                'error': f'No URLs found "{url_id}"'
+            }), 404
+
+        url.label = ''
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+        return jsonify({
+            'message': f'Successfully deleted {url_id} label',
+            'url_id': url_id
+        }), 200
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
