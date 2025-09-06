@@ -484,7 +484,6 @@ async function editUrl(urlId) {
         document.getElementById('editDuration').value = urlData.duration;
         document.getElementById('editMaxNum').value = urlData.max_num;
         document.getElementById('editUrlIsActive').checked = urlData.is_active;
-        document.getElementById('editLabel').value = urlData.label || '(暂无标签)';
 
         showEditUrlModal();
     } catch (error) {
