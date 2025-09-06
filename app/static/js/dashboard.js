@@ -909,7 +909,7 @@ async function toggleMachine(machineId) {
 }
 
 async function deleteMachine(machineId, machineName) {
-    if (!confirm(`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！`)) {
+    if (!await showConfirm('确认删除', `确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`, 'danger')) {
         return;
     }
 
@@ -918,7 +918,7 @@ async function deleteMachine(machineId, machineName) {
             method: 'DELETE'
         });
 
-        showInfo("提示",result.message);
+        showSuccess("删除成功", result.message);
 
         if (currentConfigId === machineId) {
             currentConfigId = null;
