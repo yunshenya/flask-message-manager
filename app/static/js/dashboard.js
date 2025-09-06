@@ -114,7 +114,7 @@ function switchMachine() {
         // 切换机器时清除筛选状态
         clearFilterInternal();
         updateCurrentMachineInfo();
-        loadDashboardData();
+        loadDashboardData().then(r => {});
     }
 }
 
@@ -436,7 +436,7 @@ function clearFilterInternal() {
 
 function clearFilter() {
     clearFilterInternal();
-    loadDashboardData();
+    loadDashboardData().then(r => {});
 }
 
 // ================================
@@ -623,7 +623,7 @@ async function resetAllUrls() {
         return;
     }
 
-    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'warning')) return;
+    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'danger')) return;
 
     try {
         const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
