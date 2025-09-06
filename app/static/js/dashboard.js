@@ -605,7 +605,7 @@ async function deleteUrl(urlId, urlName) {
 // 重置功能
 // ================================
 async function resetUrlCount(urlId, urlName) {
-    if (!await showConfirm('确认重置', `确定要重置URL "${urlName}" 的执行计数吗？这将同时停止其运行状态。`, 'warning')) {
+    if (!await showConfirm('确认重置', `确定要重置URL "${urlName}" 的执行计数吗？这将同时停止其运行状态。`, 'primary')) {
         return;
     }
 
