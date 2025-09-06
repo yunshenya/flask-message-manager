@@ -1,8 +1,11 @@
 let socket = null;
-
-// 在 document.addEventListener('DOMContentLoaded') 函数中添加 WebSocket 初始化
+let isWebSocketConnected = false;
+let durationUpdateInterval = null;
+let runningUrls = new Map();
+let isWebSocketInitialized = false;
+let lastNotificationTime = new Map();
 document.addEventListener('DOMContentLoaded', async () => {
-    // 初始化 WebSocket
+    // 首先初始化 WebSocket
     initWebSocket();
 
     await loadMachineList();
@@ -11,87 +14,291 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadDashboardData();
     }
 
-    // 注释掉原来的轮询 - 这行很重要！
-    // startMonitoring(5000);
 
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && currentConfigId) {
-            loadDashboardData();
+        if (document.hidden) {
+            stopDurationUpdates();
+            console.log('🔇 页面隐藏，暂停运行时长更新');
+        } else {
+            if (isWebSocketConnected && currentConfigId) {
+                startDurationUpdates();
+                loadDashboardData();
+                console.log('🔊 页面显示，恢复运行时长更新');
+            }
         }
     });
 });
 
-// 添加 WebSocket 初始化函数
+// ================================
+// 新增：WebSocket 相关函数
+// ================================
+
+// WebSocket 初始化函数
 function initWebSocket() {
+    console.log('正在初始化 WebSocket...');
+
     if (typeof io === 'undefined') {
-        console.error('Socket.IO 未加载，请检查是否引入了 socket.io.js');
+        console.error('Socket.IO 库未加载，请检查网络连接');
+        showError('连接错误', 'Socket.IO 库加载失败，实时更新功能不可用');
         return;
     }
 
-    socket = io();
+    try {
+        socket = io('/', {
+            transports: ['websocket', 'polling'],
+            timeout: 10000,
+            forceNew: true
+        });
 
+        setupWebSocketEvents();
+    } catch (error) {
+        console.error('WebSocket 初始化失败:', error);
+        showError('连接失败', 'WebSocket 连接初始化失败');
+    }
+}
+
+// 设置 WebSocket 事件监听
+function setupWebSocketEvents() {
     socket.on('connect', function() {
-        console.log('WebSocket 连接成功');
+        console.log('✅ WebSocket 连接成功');
+        isWebSocketConnected = true;
+        showSuccess('连接成功', 'WebSocket 实时更新已启用');
+
+        // 连接成功后启动运行时长更新
+        startDurationUpdates();
     });
 
-    socket.on('disconnect', function() {
-        console.log('WebSocket 连接断开');
+    socket.on('disconnect', function(reason) {
+        console.log('❌ WebSocket 连接断开:', reason);
+        isWebSocketConnected = false;
+        showWarning('连接断开', 'WebSocket 连接已断开，正在尝试重连...');
+
+        // 断开连接时停止运行时长更新
+        stopDurationUpdates();
+    });
+
+    socket.on('connect_error', function(error) {
+        console.error('WebSocket 连接错误:', error);
+        showError('连接错误', 'WebSocket 连接失败，请检查网络');
     });
 
     // 监听 URL 执行更新
     socket.on('url_executed', function(data) {
-        console.log('收到 URL 执行更新:', data);
+        console.log('📝 收到 URL 执行更新:', data);
         if (data.config_id === currentConfigId) {
-            // 只更新相关的 URL 项目
             updateSingleUrlItem(data.url_data);
-            // 更新统计数据
-            updateStatsFromSocket();
+            updateStatsFromSocket().then(r => {});
+
+            // 更新运行中URL的缓存
+            updateRunningUrlsCache(data.url_data);
+
+            showInfo('执行更新', `URL "${data.url_data.name}" 执行计数已更新`);
         }
     });
 
     // 监听状态更新
     socket.on('status_updated', function(data) {
-        console.log('收到状态更新:', data);
+        console.log('📊 收到状态更新:', data);
         if (data.config_id === currentConfigId) {
             updateUrlStatus(data.url_id, data.status);
+            showInfo('状态更新', `URL 状态已更新: ${data.status}`);
         }
     });
 
     // 监听标签更新
     socket.on('label_updated', function(data) {
-        console.log('收到标签更新:', data);
+        console.log('🏷️ 收到标签更新:', data);
         if (data.config_id === currentConfigId) {
-            // 重新加载整个列表以更新标签
-            loadDashboardData();
+            loadDashboardData().then(r => {});
+            loadLabelStats().then(r => {});
+            showInfo('标签更新', `URL "${data.url_data.name}" 标签已更新为 "${data.label}"`);
+        }
+    });
+
+    // 监听URL启动事件
+    socket.on('url_started', function(data) {
+        console.log('▶️ 收到 URL 启动事件:', data);
+        if (data.config_id === currentConfigId) {
+            updateRunningUrlsCache(data.url_data);
+            updateSingleUrlItem(data.url_data);
+        }
+    });
+
+    // 监听URL停止事件
+    socket.on('url_stopped', function(data) {
+        console.log('⏹️ 收到 URL 停止事件:', data);
+        if (data.config_id === currentConfigId) {
+            removeFromRunningUrlsCache(data.url_id);
+            updateSingleUrlItem(data.url_data);
         }
     });
 }
 
-// 添加单个 URL 项目更新函数
+// 启动运行时长更新
+function startDurationUpdates() {
+    // 如果已经有定时器在运行，先清除
+    if (durationUpdateInterval) {
+        clearInterval(durationUpdateInterval);
+    }
+
+    console.log('🕐 启动运行时长实时更新');
+
+    // 每秒更新一次运行时长
+    durationUpdateInterval = setInterval(() => {
+        updateAllRunningDurations();
+    }, 1000);
+}
+
+// 停止运行时长更新
+function stopDurationUpdates() {
+    if (durationUpdateInterval) {
+        clearInterval(durationUpdateInterval);
+        durationUpdateInterval = null;
+        console.log('🕐 停止运行时长更新');
+    }
+}
+
+// 更新运行中URL的缓存
+function updateRunningUrlsCache(urlData) {
+    if (urlData.is_running && urlData.started_at) {
+        runningUrls.set(urlData.id, {
+            id: urlData.id,
+            name: urlData.name,
+            started_at: new Date(urlData.started_at),
+            running_duration: urlData.running_duration || 0
+        });
+        console.log(`➕ 添加运行中URL到缓存: ${urlData.name}`);
+    } else {
+        removeFromRunningUrlsCache(urlData.id);
+    }
+}
+
+// 从运行中URL缓存移除
+function removeFromRunningUrlsCache(urlId) {
+    if (runningUrls.has(urlId)) {
+        const urlInfo = runningUrls.get(urlId);
+        runningUrls.delete(urlId);
+        console.log(`➖ 从缓存移除已停止URL: ${urlInfo.name}`);
+    }
+}
+
+// 更新所有运行中URL的时长显示
+function updateAllRunningDurations() {
+    if (runningUrls.size === 0) return;
+
+    const now = new Date();
+
+    runningUrls.forEach((urlInfo, urlId) => {
+        const runningSeconds = Math.floor((now - urlInfo.started_at) / 1000);
+        updateDurationDisplay(urlId, runningSeconds);
+    });
+}
+
+// 更新单个URL的时长显示
+function updateDurationDisplay(urlId, runningSeconds) {
+    const urlItem = document.querySelector(`[data-url-id="${urlId}"]`);
+    if (!urlItem) return;
+
+    let durationElement = urlItem.querySelector('.running-duration');
+    if (!durationElement) {
+        // 如果不存在时长显示元素，创建一个
+        const metaElement = urlItem.querySelector('.url-meta small');
+        if (metaElement) {
+            durationElement = document.createElement('span');
+            durationElement.className = 'running-duration';
+            durationElement.style.cssText = `
+                font-size: 0.75rem;
+                color: #28a745;
+                font-weight: bold;
+                background: #d4edda;
+                padding: 0.1rem 0.3rem;
+                border-radius: 3px;
+                margin-left: 0.5rem;
+            `;
+            metaElement.appendChild(durationElement);
+        }
+    }
+
+    if (durationElement) {
+        const formattedDuration = formatDuration(runningSeconds);
+        durationElement.textContent = `运行: ${formattedDuration}`;
+
+        // 添加闪烁效果表示实时更新
+        durationElement.style.background = '#c3e6cb';
+        setTimeout(() => {
+            durationElement.style.background = '#d4edda';
+        }, 200);
+    }
+}
+
+// 格式化时长显示
+function formatDuration(seconds) {
+    if (seconds < 0) return '0秒';
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    let result = '';
+    if (hours > 0) result += `${hours}时`;
+    if (minutes > 0) result += `${minutes}分`;
+    result += `${secs}秒`;
+
+    return result;
+}
+
+// 初始化运行中URL缓存
+function initializeRunningUrlsCache(urls) {
+    runningUrls.clear();
+
+    urls.forEach(url => {
+        if (url.is_running && url.started_at) {
+            updateRunningUrlsCache(url);
+        }
+    });
+
+    console.log(`🔄 初始化运行中URL缓存，共 ${runningUrls.size} 个运行中的URL`);
+}
+
+
 function updateSingleUrlItem(urlData) {
     const urlItem = document.querySelector(`[data-url-id="${urlData.id}"]`);
-    if (urlItem) {
-        // 更新计数显示
-        const countDisplay = urlItem.querySelector('.count-display');
-        if (countDisplay) {
-            countDisplay.textContent = `${urlData.current_count}/${urlData.max_num}`;
-        }
+    if (!urlItem) {
+        console.log('未找到对应的 URL 项目，重新加载数据');
+        loadDashboardData().then(r => {});
+        return;
+    }
 
-        // 更新进度条
-        const progressBar = urlItem.querySelector('.progress-bar');
-        if (progressBar) {
-            const progressPercent = (urlData.current_count / urlData.max_num) * 100;
-            progressBar.style.width = `${Math.min(progressPercent, 100)}%`;
-            if (progressPercent >= 100) {
-                progressBar.classList.add('completed');
-            }
-        }
+    // 更新计数显示
+    const countDisplay = urlItem.querySelector('.count-display');
+    if (countDisplay) {
+        countDisplay.textContent = `${urlData.current_count}/${urlData.max_num}`;
+    }
 
-        // 更新状态
-        if (urlData.current_count >= urlData.max_num) {
+    // 更新进度条
+    const progressBar = urlItem.querySelector('.progress-bar');
+    if (progressBar) {
+        const progressPercent = (urlData.current_count / urlData.max_num) * 100;
+        progressBar.style.width = `${Math.min(progressPercent, 100)}%`;
+
+        if (progressPercent >= 100) {
+            progressBar.classList.add('completed');
             urlItem.classList.add('completed');
         }
     }
+
+    // 更新运行状态
+    if (urlData.is_running) {
+        urlItem.classList.add('running');
+    } else {
+        urlItem.classList.remove('running');
+    }
+
+    // 添加更新动画
+    urlItem.style.background = '#e8f5e8';
+    setTimeout(() => {
+        urlItem.style.background = '';
+    }, 1000);
 }
 
 // 添加状态更新函数
@@ -102,6 +309,15 @@ function updateUrlStatus(urlId, status) {
         if (contentElement) {
             contentElement.textContent = status || '暂无状态信息';
             contentElement.className = `status-content ${status ? '' : 'empty'}`;
+        }
+
+        // 更新状态显示框样式
+        if (status && status.trim()) {
+            statusElement.classList.add('has-status');
+            statusElement.classList.remove('empty');
+        } else {
+            statusElement.classList.remove('has-status');
+            statusElement.classList.add('empty');
         }
 
         // 添加更新动画
@@ -121,6 +337,143 @@ async function updateStatsFromSocket() {
         console.error('更新统计数据失败:', error);
     }
 }
+
+
+async function loadDashboardData() {
+    if (!currentConfigId) {
+        console.warn('没有选中的机器');
+        return;
+    }
+
+    try {
+        const [statusData, urlsData] = await Promise.all([
+            apiCall(`/api/config/${currentConfigId}/status`),
+            apiCall(`/api/config/${currentConfigId}/urls`)
+        ]);
+
+        currentConfigData = statusData.config;
+        updateStatistics(statusData);
+
+        // 根据当前筛选状态决定显示哪些URL
+        let urlsToDisplay;
+        if (currentFilter.isActive && currentFilter.type === 'label') {
+            await applyCurrentFilter();
+            // 获取筛选后的URL来初始化缓存
+            const filteredResponse = await apiCall(`/api/urls/by-label/${encodeURIComponent(currentFilter.value)}?config_id=${currentConfigId}`);
+            urlsToDisplay = filteredResponse.urls;
+        } else {
+            updateUrlList(urlsData.urls);
+            urlsToDisplay = urlsData.urls;
+        }
+
+        // 初始化运行中URL缓存
+        initializeRunningUrlsCache(urlsToDisplay);
+
+        // 加载标签统计
+        await loadLabelStats();
+
+        lastUpdateTime = Date.now();
+        updatePageTitle();
+
+    } catch (error) {
+        console.error('加载数据失败:', error);
+    }
+}
+
+// 修改 updateUrlList 函数，在现有函数中找到这部分并替换
+function updateUrlList(urls) {
+    const urlList = document.getElementById('urlList');
+    if (!urlList) return;
+
+    if (urls.length === 0) {
+        const emptyMessage = currentFilter.isActive
+            ? `没有找到标签为 "${currentFilter.value}" 的URL`
+            : '当前机器暂无URL配置';
+        urlList.innerHTML = `<div style="padding: 2rem; text-align: center; color: #666;">${emptyMessage}</div>`;
+        return;
+    }
+
+    urlList.innerHTML = urls.map(url => {
+        const progressPercent = (url.current_count / url.max_num) * 100;
+        let statusButton = getStatusButton(url);
+        let runningInfo = getRunningInfo(url);
+
+        const hasLabel = url.label && url.label.trim();
+        const labelClass = hasLabel ? 'url-item-labeled' : '';
+
+        return `
+            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''} ${url.is_running ? 'running' : ''} ${labelClass}" data-url-id="${url.id}">
+                <div class="url-info">
+                    <div class="url-name">
+                        ${url.name}
+                        ${hasLabel ? `<span class="url-label-badge">${url.label}</span>` : ''}
+                        ${runningInfo}
+                    </div>
+                    <div class="url-link">${url.url}</div>
+                    
+                    <div class="status-display ${url.status && url.status.trim() ? 'has-status' : 'empty'}" id="status-${url.id}">
+                        <div class="status-indicator ${url.is_running ? 'active' : ''}"></div>
+                        <div class="status-label">状态</div>
+                        <div class="status-content ${url.status && url.status.trim() ? '' : 'empty'}">
+                            ${url.status && url.status.trim() ? url.status : '暂无状态信息'}
+                        </div>
+                    </div>
+                    
+                    <div class="url-meta">
+                        <small>
+                            持续: ${url.duration}秒 | 
+                            最大次数: ${url.max_num} | 
+                            当前: ${url.current_count} | 
+                            状态: ${url.is_active ? '激活' : '禁用'}
+                            ${url.Last_time ? ' | 最后执行: ' + new Date(url.Last_time).toLocaleString() : ''}
+                            ${url.is_running && url.started_at ? `<span class="running-duration" style="font-size: 0.75rem; color: #28a745; font-weight: bold; background: #d4edda; padding: 0.1rem 0.3rem; border-radius: 3px; margin-left: 0.5rem;">运行: ${formatDuration(url.running_duration || 0)}</span>` : ''}
+                        </small>
+                    </div>
+                </div>
+                <div class="url-stats">
+                    <span class="count-display">${url.current_count}/${url.max_num}</span>
+                    <div class="progress">
+                        <div class="progress-bar ${progressPercent >= 100 ? 'completed' : ''}" 
+                                style="width: ${Math.min(progressPercent, 100)}%"></div>
+                    </div>
+                    <div class="url-actions">
+                        ${statusButton}
+                        ${getControlButtons(url)}
+                        ${hasLabel ? `<button class="btn btn-warning btn-sm" onclick="removeUrlLabel(${url.id}, '${url.name.replace(/'/g, '&#39;')}', '${url.label.replace(/'/g, '&#39;')}')" title="删除标签">🏷️删除标签</button>` : ''}
+                        <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
+                        <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
+                        <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+
+window.addEventListener('beforeunload', () => {
+    stopDurationUpdates();
+    if (socket) {
+        socket.disconnect();
+    }
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 初始化 WebSocket
+    initWebSocket();
+
+    await loadMachineList();
+
+    if (currentConfigId) {
+        await loadDashboardData();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentConfigId) {
+            loadDashboardData();
+        }
+    });
+});
 
 
 
@@ -269,43 +622,6 @@ function updateCurrentMachineInfo() {
     }
 }
 
-// ================================
-// 数据加载和状态监控
-// ================================
-async function loadDashboardData() {
-    if (!currentConfigId) {
-        console.warn('没有选中的机器');
-        return;
-    }
-
-    try {
-        const [statusData, urlsData] = await Promise.all([
-            apiCall(`/api/config/${currentConfigId}/status`),
-            apiCall(`/api/config/${currentConfigId}/urls`)
-        ]);
-
-        currentConfigData = statusData.config;
-        updateStatistics(statusData);
-
-        // 根据当前筛选状态决定显示哪些URL
-        if (currentFilter.isActive && currentFilter.type === 'label') {
-            // 如果有筛选状态，应用筛选
-            await applyCurrentFilter();
-        } else {
-            // 没有筛选，显示所有URL
-            updateUrlList(urlsData.urls);
-        }
-
-        // 加载标签统计
-        await loadLabelStats();
-
-        lastUpdateTime = Date.now();
-        updatePageTitle();
-
-    } catch (error) {
-        console.error('加载数据失败:', error);
-    }
-}
 
 // 新增：应用当前筛选
 async function applyCurrentFilter() {
@@ -337,74 +653,6 @@ function updateStatistics(statusData) {
     if (elements.completedUrls) elements.completedUrls.textContent = statusData.completed_urls;
 }
 
-function updateUrlList(urls) {
-    const urlList = document.getElementById('urlList');
-    if (!urlList) return;
-
-    if (urls.length === 0) {
-        const emptyMessage = currentFilter.isActive
-            ? `没有找到标签为 "${currentFilter.value}" 的URL`
-            : '当前机器暂无URL配置';
-        urlList.innerHTML = `<div style="padding: 2rem; text-align: center; color: #666;">${emptyMessage}</div>`;
-        return;
-    }
-
-    urlList.innerHTML = urls.map(url => {
-        const progressPercent = (url.current_count / url.max_num) * 100;
-        let statusButton = getStatusButton(url);
-        let runningInfo = getRunningInfo(url);
-
-        const hasLabel = url.label && url.label.trim();
-        const labelClass = hasLabel ? 'url-item-labeled' : '';
-
-        return `
-            <div class="url-item ${url.current_count >= url.max_num ? 'completed' : ''} ${url.is_running ? 'running' : ''} ${labelClass}" data-url-id="${url.id}">
-                <div class="url-info">
-                    <div class="url-name">
-                        ${url.name}
-                        ${hasLabel ? `<span class="url-label-badge">${url.label}</span>` : ''}
-                        ${runningInfo}
-                    </div>
-                    <div class="url-link">${url.url}</div>
-                    
-                    <div class="status-display ${url.status && url.status.trim() ? 'has-status' : 'empty'}" id="status-${url.id}">
-                        <div class="status-indicator ${url.is_running ? 'active' : ''}"></div>
-                        <div class="status-label">状态</div>
-                        <div class="status-content ${url.status && url.status.trim() ? '' : 'empty'}">
-                            ${url.status && url.status.trim() ? url.status : '暂无状态信息'}
-                        </div>
-                    </div>
-                    
-                    <div class="url-meta">
-                        <small>
-                            持续: ${url.duration}秒 | 
-                            最大次数: ${url.max_num} | 
-                            当前: ${url.current_count} | 
-                            状态: ${url.is_active ? '激活' : '禁用'}
-                            ${url.Last_time ? ' | 最后执行: ' + new Date(url.Last_time).toLocaleString() : ''}
-                            ${getRunningDurationInfo(url)}
-                        </small>
-                    </div>
-                </div>
-                <div class="url-stats">
-                    <span class="count-display">${url.current_count}/${url.max_num}</span>
-                    <div class="progress">
-                        <div class="progress-bar ${progressPercent >= 100 ? 'completed' : ''}" 
-                                style="width: ${Math.min(progressPercent, 100)}%"></div>
-                    </div>
-                    <div class="url-actions">
-                        ${statusButton}
-                        ${getControlButtons(url)}
-                        ${hasLabel ? `<button class="btn btn-warning btn-sm" onclick="removeUrlLabel(${url.id}, '${url.name.replace(/'/g, '&#39;')}', '${url.label.replace(/'/g, '&#39;')}')" title="删除标签">🏷️删除标签</button>` : ''}
-                        <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
-                        <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
-                        <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
 
 function getStatusButton(url) {
     if (!url.can_execute) {
@@ -426,28 +674,6 @@ function getRunningInfo(url) {
     } else {
         return `<span class="execution-status status-pending">等待中</span>`;
     }
-}
-
-function getRunningDurationInfo(url) {
-    if (!url.started_at || !url.running_duration) {
-        return '';
-    }
-
-    if (url.running_duration > 0) {
-        const hours = Math.floor(url.running_duration / 3600);
-        const minutes = Math.floor((url.running_duration % 3600) / 60);
-        const seconds = url.running_duration % 60;
-
-        let duration = '';
-        if (hours > 0) duration += `${hours}时`;
-        if (minutes > 0) duration += `${minutes}分`;
-        duration += `${seconds}秒`;
-
-        const statusText = url.is_running ? '运行时长' : '运行了';
-        return ` | ${statusText}: ${duration}`;
-    }
-
-    return '';
 }
 
 function getControlButtons(url) {
@@ -1062,27 +1288,6 @@ async function deleteMachine(machineId, machineName) {
     }
 }
 
-// ================================
-// 实时监控功能
-// ================================
-function startMonitoring(intervalMs = 5000) {
-    if (monitoringInterval) {
-        clearInterval(monitoringInterval);
-    }
-
-    console.log(`开始实时监控，刷新间隔: ${intervalMs}ms`);
-
-    monitoringInterval = setInterval(async () => {
-        if (document.hidden || !currentConfigId) return;
-
-        try {
-            // 实时监控时保持筛选状态
-            await loadDashboardData();
-        } catch (error) {
-            console.error('监控刷新失败:', error);
-        }
-    }, intervalMs);
-}
 
 function stopMonitoring() {
     if (monitoringInterval) {
@@ -1101,21 +1306,17 @@ function refreshData() {
     loadDashboardData().then(() => {
         showSuccess("成功", "数据刷新完成");
     }).catch(error => {
-        showError("失败", "刷新失败");
+        showError("失败", error);
     });
 }
 
-// ================================
-// 页面初始化
-// ================================
+
 document.addEventListener('DOMContentLoaded', async () => {
     await loadMachineList();
 
     if (currentConfigId) {
         await loadDashboardData();
     }
-
-    startMonitoring(5000);
 
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && currentConfigId) {
@@ -1403,7 +1604,7 @@ async function removeUrlLabel(urlId, urlName, currentLabel) {
         const result = await apiCall(`/api/url/${urlId}/remove-label`, {
             method: 'POST'
         });
-
+        console.log(result);
         showSuccess("成功", `已删除URL "${urlName}" 的标签`);
         await loadDashboardData();
         await loadLabelStats();

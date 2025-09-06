@@ -64,9 +64,22 @@ def stop():
         if config:
             # 停止该配置下所有URL的运行状态
             urls = UrlData.query.filter_by(config_id=config.id, is_running=True).all()
+            stopped_urls = []
             for url in urls:
-                url.stop_running()
+                if url.stop_running():
+                    stopped_urls.append(url.to_dict())
+
             db.session.commit()
+
+            # 推送所有停止的URL事件
+            for url_data in stopped_urls:
+                socketio.emit('url_stopped', {
+                    'url_id': url_data['id'],
+                    'config_id': config.id,
+                    'url_data': url_data,
+                    'timestamp': datetime.datetime.now().isoformat()
+                })
+
             logger.info(f"已停止配置 {config.id} 下 {len(urls)} 个URL的运行状态")
 
         return jsonify({"message": "停止成功", "msg": result})
@@ -101,11 +114,23 @@ def start():
             ).filter(UrlData.current_count < UrlData.max_num).all()
 
             started_count = 0
+            started_urls = []
             for url in urls:
                 if url.start_running():
                     started_count += 1
+                    started_urls.append(url.to_dict())
 
             db.session.commit()
+
+            # 推送所有启动的URL事件
+            for url_data in started_urls:
+                socketio.emit('url_started', {
+                    'url_id': url_data['id'],
+                    'config_id': config.id,
+                    'url_data': url_data,
+                    'timestamp': datetime.datetime.now().isoformat()
+                })
+
             logger.info(f"已启动配置 {config.id} 下 {started_count} 个URL的运行状态")
 
         return jsonify({"message": "启动成功", "msg": result})
@@ -180,6 +205,15 @@ def start_url(url_id):
 
         if url.start_running():
             db.session.commit()
+
+            # 添加 WebSocket 推送
+            socketio.emit('url_started', {
+                'url_id': url_id,
+                'config_id': url.config_id,
+                'url_data': url.to_dict(),
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
             return jsonify({
                 'message': f'URL "{url.name}" started successfully',
                 'url_data': url.to_dict()
@@ -205,6 +239,15 @@ def stop_url(url_id):
 
         if url.stop_running():
             db.session.commit()
+
+            # 添加 WebSocket 推送
+            socketio.emit('url_stopped', {
+                'url_id': url_id,
+                'config_id': url.config_id,
+                'url_data': url.to_dict(),
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
             return jsonify({
                 'message': f'URL "{url.name}" stopped successfully',
                 'url_data': url.to_dict()
@@ -234,11 +277,23 @@ def start_config_urls(config_id):
         ).filter(UrlData.current_count < UrlData.max_num).all()
 
         started_count = 0
+        started_urls = []
         for url in urls:
             if url.start_running():
                 started_count += 1
+                started_urls.append(url.to_dict())
 
         db.session.commit()
+
+        # 批量推送启动事件
+        for url_data in started_urls:
+            socketio.emit('url_started', {
+                'url_id': url_data['id'],
+                'config_id': config_id,
+                'url_data': url_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
         return jsonify({
             'message': f'Started {started_count} URLs successfully',
             'total_available': len(urls),
@@ -262,11 +317,23 @@ def stop_config_urls(config_id):
         urls = UrlData.query.filter_by(config_id=config_id, is_running=True).all()
 
         stopped_count = 0
+        stopped_urls = []
         for url in urls:
             if url.stop_running():
                 stopped_count += 1
+                stopped_urls.append(url.to_dict())
 
         db.session.commit()
+
+        # 批量推送停止事件
+        for url_data in stopped_urls:
+            socketio.emit('url_stopped', {
+                'url_id': url_data['id'],
+                'config_id': config_id,
+                'url_data': url_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
         return jsonify({
             'message': f'Stopped {stopped_count} URLs successfully',
             'total_running': len(urls),
@@ -378,4 +445,33 @@ def delete_label_token():
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@bp.route("/config/<int:config_id>/running-durations", methods=["GET"])
+@login_required
+def get_running_durations(config_id):
+    """获取配置下所有运行中URL的时长"""
+    try:
+        running_urls = UrlData.query.filter_by(
+            config_id=config_id,
+            is_running=True
+        ).all()
+
+        durations = []
+        for url in running_urls:
+            durations.append({
+                'url_id': url.id,
+                'name': url.name,
+                'started_at': url.started_at.isoformat() if url.started_at else None,
+                'running_duration': url.get_running_duration()
+            })
+
+        return jsonify({
+            'config_id': config_id,
+            'running_urls_count': len(durations),
+            'durations': durations,
+            'total_running_time': sum(d['running_duration'] for d in durations)
+        })
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
