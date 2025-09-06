@@ -19,8 +19,8 @@ def create_app(config_class=Config):
     socketio.init_app(app,
                         cors_allowed_origins="*",
                         async_mode='eventlet',  # 指定异步模式
-                        logger=True,            # 启用日志
-                        engineio_logger=True,   # 启用引擎日志
+                        logger=False,            # 启用日志
+                        engineio_logger=False,   # 启用引擎日志
                         ping_timeout=60,        # 增加超时时间
                         ping_interval=25,       # 设置心跳间隔
                         transports=['websocket', 'polling']  # 明确指定传输方式
