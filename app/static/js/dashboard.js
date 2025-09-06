@@ -746,7 +746,10 @@ async function stopAllMachines() {
 // ================================
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
-    loadMachineManagementList().then(r => {});
+    // 每次打开都重新加载最新数据
+    loadMachineManagementList().then(r => {
+        console.log('机器管理列表已刷新');
+    });
 }
 
 function hideMachineManagement() {
@@ -813,7 +816,9 @@ async function saveEditedMachine(event) {
 
         alert('机器更新成功!');
         hideEditMachineModal();
+        // 刷新机器管理列表
         await loadMachineManagementList();
+        // 刷新下拉列表
         await loadMachineList();
         updateCurrentMachineInfo();
     } catch (error) {
@@ -894,7 +899,9 @@ async function toggleMachine(machineId) {
         });
 
         alert(result.message);
+        // 刷新机器管理列表
         await loadMachineManagementList();
+        // 刷新下拉列表
         await loadMachineList();
         updateCurrentMachineInfo();
     } catch (error) {
@@ -919,7 +926,9 @@ async function deleteMachine(machineId, machineName) {
             currentConfigData = null;
         }
 
+        // 刷新机器管理列表
         await loadMachineManagementList();
+        // 刷新下拉列表
         await loadMachineList();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -1017,8 +1026,11 @@ async function syncNewMachines() {
 
             console.log('新增机器详情:', result.created_machines);
 
-            // 刷新机器列表
+            // 刷新下拉列表中的机器列表
             await loadMachineList();
+
+            // 重要：同时刷新机器管理模态框中的列表
+            await loadMachineManagementList();
 
             // 如果当前没有选中机器，选择第一台新机器
             if (!currentConfigId && result.created_machines.length > 0) {
@@ -1171,11 +1183,57 @@ async function showVmosMachinesList() {
 }
 
 async function syncNewMachinesFromModal() {
-    // 关闭模态框
+    // 关闭VMOS模态框
     document.getElementById('vmosMachinesModal').style.display = 'none';
 
-    // 执行同步
-    await syncNewMachines();
+    try {
+        // 显示加载状态
+        const syncBtn = document.querySelector('button[onclick="syncNewMachinesFromModal()"]');
+        if (syncBtn) {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="loading-indicator"></span> 同步中...';
+        }
+
+        // 执行同步
+        const result = await apiCall('/api/machines/sync-new', {
+            method: 'POST'
+        });
+
+        if (result.new_machines_count > 0) {
+            alert(`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+                `现有机器: ${result.existing_machines_count} 台\n` +
+                `总计机器: ${result.total_machines} 台`);
+
+            console.log('新增机器详情:', result.created_machines);
+
+            // 刷新下拉列表中的机器列表
+            await loadMachineList();
+
+            // 重要：刷新机器管理模态框中的列表
+            await loadMachineManagementList();
+
+            // 如果当前没有选中机器，选择第一台新机器
+            if (!currentConfigId && result.created_machines.length > 0) {
+                currentConfigId = result.created_machines[0].id;
+                document.getElementById('machineSelect').value = currentConfigId;
+                updateCurrentMachineInfo();
+                await loadDashboardData();
+            }
+        } else {
+            alert(`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+        }
+
+    } catch (error) {
+        console.error('同步新机器失败:', error);
+        alert('同步新机器失败，请检查网络连接或稍后重试');
+    } finally {
+        // 恢复按钮状态
+        const syncBtn = document.querySelector('button[onclick="syncNewMachinesFromModal()"]');
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = '✅ 添加这些新机器到系统';
+        }
+    }
 }
 
 function hideVmosMachinesModal() {
