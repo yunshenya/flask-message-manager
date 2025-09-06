@@ -322,15 +322,14 @@
                     <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else '从未' }}</td>
                     <td>
                         {% if user.id != session.user_id %}
-                        <a href="{{ url_for('admin.toggle_user_status', user_id=user.id) }}"
-                           class="btn btn-warning">
+                        <button class="btn btn-warning"
+                                onclick="confirmToggleUser({{ user.id }}, '{{ user.username }}', '{{ user.is_active }}', '{{ url_for('admin.toggle_user_status', user_id=user.id) }}')">
                             {{ '禁用' if user.is_active else '激活' }}
-                        </a>
-                        <a href="{{ url_for('admin.delete_user', user_id=user.id) }}"
-                           class="btn btn-danger"
-                           onclick="return confirm('确定删除用户 {{ user.username }} 吗？')">
+                        </button>
+                        <button class="btn btn-danger"
+                                onclick="confirmDeleteUser({{ user.id }}, '{{ user.username }}', '{{ url_for('admin.delete_user', user_id=user.id) }}')">
                             删除
-                        </a>
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
@@ -908,6 +907,31 @@
 
     function hideVmosMachinesModal() {
         document.getElementById('vmosMachinesModal').style.display = 'none';
+    }
+    async function confirmToggleUser(userId, username, isActiveStr, toggleUrl) {
+        const isActive = isActiveStr === 'True';
+        const action = isActive ? '禁用' : '激活';
+        const type = isActive ? 'danger' : 'primary';
+
+        if (await showConfirm(`确认${action}`, `确定要${action}用户 "${username}" 吗？`, type)) {
+            try {
+                showInfo('处理中', `正在${action}用户...`);
+                window.location.href = toggleUrl;
+            } catch (error) {
+                showError(`${action}失败`, `${action}用户时发生错误`);
+            }
+        }
+    }
+
+    async function confirmDeleteUser(userId, username, deleteUrl) {
+        if (await showConfirm('确认删除', `确定删除用户 "${username}" 吗？此操作不可撤销。`, 'danger')) {
+            try {
+                showInfo('处理中', '正在删除用户...');
+                window.location.href = deleteUrl;
+            } catch (error) {
+                showError('删除失败', '删除用户时发生错误');
+            }
+        }
     }
 </script>
 </body>
