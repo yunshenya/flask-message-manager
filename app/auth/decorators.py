@@ -1,5 +1,7 @@
 import os
 from functools import wraps
+from typing import Any
+
 from flask import session, request, jsonify, redirect, url_for, flash
 from app import db
 from app.models.user import User
@@ -40,7 +42,7 @@ def token_required(f):
     def decorated(*args, **kwargs):
         token = None
         if 'token' in request.headers:
-            auth_header = request.headers['token']
+            auth_header: Any = request.headers['token']
             try:
                 token = auth_header.split(" ")[1]
             except IndexError:

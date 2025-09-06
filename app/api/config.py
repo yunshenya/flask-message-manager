@@ -86,7 +86,6 @@ def reset_config_counts(config_id):
         urls = UrlData.query.filter_by(config_id=config_id).all()
         for url in urls:
             url.reset_counts()
-
         db.session.commit()
         return jsonify({'message': f'Reset {len(urls)} URLs successfully'})
     except Exception as e:

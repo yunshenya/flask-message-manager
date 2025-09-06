@@ -94,7 +94,6 @@ class UrlData(db.Model):
     def reset_counts(self):
         """重置计数和运行状态"""
         self.current_count = 0
-        self.last_time = None
         self.is_running = False
         self.started_at = None
         self.stopped_at = None
