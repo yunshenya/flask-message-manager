@@ -34,7 +34,7 @@ async function apiCall(url, options = {}) {
         return await response.json();
     } catch (error) {
         console.error('API调用错误:', error);
-        alert('操作失败: ' + error.message);
+        showError("失败",'操作失败: ' + error.message);
         throw error;
     }
 }
@@ -392,7 +392,7 @@ function updateLabelStats(labelStats) {
 
 async function filterByLabel(label) {
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showInfo("提示", '请先选择一台机器');
         return;
     }
 
@@ -418,7 +418,7 @@ async function filterByLabel(label) {
 
     } catch (error) {
         console.error('按标签筛选失败:', error);
-        alert('筛选失败');
+        showError("失败",'筛选失败');
     }
 }
 
@@ -488,7 +488,7 @@ async function editUrl(urlId) {
         showEditUrlModal();
     } catch (error) {
         console.error('获取URL信息失败:', error);
-        alert('获取URL信息失败');
+        showError("失败", '获取URL信息失败');
     }
 }
 
@@ -505,7 +505,7 @@ async function saveEditedUrl(event) {
     event.preventDefault();
 
     if (!currentEditingUrlId) {
-        alert('无效的编辑操作');
+        showError("失败", '无效的编辑操作');
         return;
     }
 
@@ -523,7 +523,7 @@ async function saveEditedUrl(event) {
             body: JSON.stringify(data)
         });
 
-        alert('URL更新成功!');
+        showSuccess("成功", 'URL更新成功!');
         hideEditUrlModal();
         await loadDashboardData();
     } catch (error) {
@@ -536,7 +536,7 @@ async function saveEditedUrl(event) {
 // ================================
 function showAddUrlModal() {
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showInfo("提示", '请先选择一台机器');
         return;
     }
     document.getElementById('addUrlModal').style.display = 'block';
@@ -550,7 +550,7 @@ async function addUrl(event) {
     event.preventDefault();
 
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showInfo("提示", '请先选择一台机器');
         return;
     }
 
@@ -568,7 +568,7 @@ async function addUrl(event) {
             body: JSON.stringify(data)
         });
 
-        alert('URL添加成功!');
+        showSuccess("成功", '添加成功');
         hideAddUrlModal();
         document.querySelector('#addUrlModal form').reset();
         await loadDashboardData();
@@ -581,7 +581,7 @@ async function addUrl(event) {
 // URL删除功能
 // ================================
 async function deleteUrl(urlId, urlName) {
-    if (!confirm(`确定要删除URL "${urlName}" 吗？此操作不可撤销。`)) {
+    if (!await showConfirm('确认删除', `确定要删除URL "${urlName}" 吗？此操作不可撤销。`, 'danger')) {
         return;
     }
 
@@ -590,7 +590,7 @@ async function deleteUrl(urlId, urlName) {
             method: 'DELETE'
         });
 
-        alert('URL删除成功!');
+        showSuccess("成功", 'URL删除成功!');
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -601,7 +601,7 @@ async function deleteUrl(urlId, urlName) {
 // 重置功能
 // ================================
 async function resetUrlCount(urlId, urlName) {
-    if (!confirm(`确定要重置URL "${urlName}" 的执行计数吗？这将同时停止其运行状态。`)) {
+    if (!await showConfirm('确认重置', `确定要重置URL "${urlName}" 的执行计数吗？这将同时停止其运行状态。`, 'warning')) {
         return;
     }
 
@@ -610,7 +610,7 @@ async function resetUrlCount(urlId, urlName) {
             method: 'POST'
         });
 
-        alert('URL计数重置成功!');
+        showSuccess("成功" + 'URL计数重置成功!');
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -619,15 +619,15 @@ async function resetUrlCount(urlId, urlName) {
 
 async function resetAllUrls() {
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showInfo("提示", '请先选择一台机器');
         return;
     }
 
-    if (!confirm('确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。')) return;
+    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'warning')) return;
 
     try {
         const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
-        alert(result.message);
+        showInfo("提示",result.message);
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -639,7 +639,7 @@ async function resetAllUrls() {
 // ================================
 async function startCurrentMachine() {
     if (!currentConfigData || !currentConfigData.pade_code) {
-        alert('当前机器没有配置代码');
+        showError("配置出错", '当前机器没有配置代码');
         return;
     }
 
@@ -648,19 +648,18 @@ async function startCurrentMachine() {
             method: 'POST',
             body: JSON.stringify({ pade_code: currentConfigData.pade_code })
         });
-
         console.log('启动成功:', result);
         await loadDashboardData();
-        alert('当前机器启动成功!');
+        showSuccess('成功', '当前机器启动成功');
     } catch (error) {
         console.error('启动失败:', error);
-        alert('当前机器启动失败');
+        showError("启动失败",'当前机器启动失败');
     }
 }
 
 async function stopCurrentMachine() {
     if (!currentConfigData || !currentConfigData.pade_code) {
-        alert('当前机器没有配置代码');
+        showError("配置错误",'当前机器没有配置代码');
         return;
     }
 
@@ -672,20 +671,20 @@ async function stopCurrentMachine() {
 
         console.log('停止成功:', result);
         await loadDashboardData();
-        alert('当前机器停止成功!');
+        showSuccess("成功", '当前机器停止成功!');
     } catch (error) {
         console.error('停止失败:', error);
-        alert('当前机器停止失败');
+        showError("失败", '当前机器停止失败');
     }
 }
 
 async function startAllMachines() {
     if (!availableMachines.length) {
-        alert('没有可用的机器');
+        showError("失败", '没有可用的机器');
         return;
     }
 
-    if (!confirm('确定要启动所有机器吗？')) {
+    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'secondary')) {
         return;
     }
 
@@ -707,17 +706,17 @@ async function startAllMachines() {
         }
     }
 
-    alert(`批量启动完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
+    showSuccess("成功",`批量启动完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
     await loadDashboardData();
 }
 
 async function stopAllMachines() {
     if (!availableMachines.length) {
-        alert('没有可用的机器');
+        showError("错误",'没有可用的机器');
         return;
     }
 
-    if (!confirm('确定要停止所有机器吗？')) return;
+    if (!await showConfirm('确认停止', '确定要停止所有机器吗？', 'danger')) return;
 
     let successCount = 0;
     let failCount = 0;
@@ -737,7 +736,7 @@ async function stopAllMachines() {
         }
     }
 
-    alert(`批量停止完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
+    showSuccess("成功", `批量停止完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
     await loadDashboardData();
 }
 
@@ -785,7 +784,7 @@ async function editMachine(machineId) {
         showEditMachineModal();
     } catch (error) {
         console.error('获取机器信息失败:', error);
-        alert('获取机器信息失败');
+        showError("失败", '获取机器信息失败');
     }
 }
 
@@ -793,7 +792,7 @@ async function saveEditedMachine(event) {
     event.preventDefault();
 
     if (!currentEditingMachineId) {
-        alert('无效的编辑操作');
+        showError("失败", '无效的编辑操作');
         return;
     }
 
@@ -814,7 +813,7 @@ async function saveEditedMachine(event) {
             body: JSON.stringify(data)
         });
 
-        alert('机器更新成功!');
+        showSuccess("成功", '机器更新成功!');
         hideEditMachineModal();
         // 刷新机器管理列表
         await loadMachineManagementList();
@@ -828,7 +827,7 @@ async function saveEditedMachine(event) {
 
 async function editCurrentMachine() {
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showError("操作失败",'请先选择一台机器');
         return;
     }
     await editMachine(currentConfigId);
@@ -888,7 +887,7 @@ async function loadMachineManagementList() {
             </table>
         `;
     } catch (error) {
-        console.error('加载机器管理列表失败:', error);
+        showError('操作失败', error);
     }
 }
 
@@ -898,7 +897,7 @@ async function toggleMachine(machineId) {
             method: 'POST'
         });
 
-        alert(result.message);
+        showInfo("提示",result.message);
         // 刷新机器管理列表
         await loadMachineManagementList();
         // 刷新下拉列表
@@ -919,7 +918,7 @@ async function deleteMachine(machineId, machineName) {
             method: 'DELETE'
         });
 
-        alert(result.message);
+        showInfo("提示",result.message);
 
         if (currentConfigId === machineId) {
             currentConfigId = null;
@@ -967,14 +966,14 @@ function stopMonitoring() {
 
 function refreshData() {
     if (!currentConfigId) {
-        alert('请先选择一台机器');
+        showInfo("提示",'请先选择一台机器');
         return;
     }
 
     loadDashboardData().then(() => {
-        alert("数据刷新完成");
+        showSuccess("成功", "数据刷新完成");
     }).catch(error => {
-        alert("刷新失败");
+        showError("失败", "刷新失败");
     });
 }
 
@@ -1003,7 +1002,7 @@ window.addEventListener('beforeunload', () => {
 
 
 async function syncNewMachines() {
-    if (!confirm('确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。')) {
+    if (!await showConfirm('确认同步', '确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
         return;
     }
 
@@ -1020,7 +1019,7 @@ async function syncNewMachines() {
         });
 
         if (result.new_machines_count > 0) {
-            alert(`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+            showSuccess("成功", `同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
                 `现有机器: ${result.existing_machines_count} 台\n` +
                 `总计机器: ${result.total_machines} 台`);
 
@@ -1040,12 +1039,12 @@ async function syncNewMachines() {
                 await loadDashboardData();
             }
         } else {
-            alert(`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+            showInfo("提示",`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
         }
 
     } catch (error) {
         console.error('同步新机器失败:', error);
-        alert('同步新机器失败，请检查网络连接或稍后重试');
+        showError("错误", '同步新机器失败，请检查网络连接或稍后重试');
     } finally {
         // 恢复按钮状态
         const syncBtn = document.querySelector('button[onclick="syncNewMachines()"]');
@@ -1200,7 +1199,7 @@ async function syncNewMachinesFromModal() {
         });
 
         if (result.new_machines_count > 0) {
-            alert(`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+            showSuccess("成功",`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
                 `现有机器: ${result.existing_machines_count} 台\n` +
                 `总计机器: ${result.total_machines} 台`);
 
@@ -1220,12 +1219,12 @@ async function syncNewMachinesFromModal() {
                 await loadDashboardData();
             }
         } else {
-            alert(`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+            showInfo("提示",`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
         }
 
     } catch (error) {
         console.error('同步新机器失败:', error);
-        alert('同步新机器失败，请检查网络连接或稍后重试');
+        showError("失败",'同步新机器失败，请检查网络连接或稍后重试');
     } finally {
         // 恢复按钮状态
         const syncBtn = document.querySelector('button[onclick="syncNewMachinesFromModal()"]');

@@ -259,7 +259,7 @@ def batch_update_labels():
         if not data or 'updates' not in data:
             return jsonify({'error': 'Missing updates data'}), 400
 
-        updates = data['updates']  # 格式：[{"url_id": 1, "label": "新标签"}, ...]
+        updates = data['updates']
 
         updated_count = 0
         results = []

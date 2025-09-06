@@ -30,6 +30,7 @@
         .message-link { cursor: pointer; color: #007bff; text-decoration: underline; }
         .message-link:hover { color: #0056b3; }
     </style>
+    <script src="../static/js/notification.js"></script>
 </head>
 <body>
 <div class="header">
@@ -250,7 +251,7 @@
         event.preventDefault();
 
         if (!currentEditingMachineId) {
-            alert('无效的编辑操作');
+            showError('编辑失败', '无效的编辑操作');
             return;
         }
 
@@ -271,7 +272,7 @@
                 body: JSON.stringify(data)
             });
 
-            alert('机器更新成功!');
+            showSuccess('更新成功', '机器配置已成功更新');
             hideEditMachineModal();
             await loadMachines();
         } catch (error) {
@@ -319,7 +320,7 @@
             return await response.json();
         } catch (error) {
             console.error('API调用错误:', error);
-            alert('操作失败: ' + error.message);
+            showError('操作失败', error.message);
             throw error;
         }
     }
@@ -405,7 +406,7 @@
                 method: 'POST'
             });
 
-            alert(result.message);
+            showInfo("请求返回", result.message);
             await loadMachines();
         } catch (error) {
             // 错误已在apiCall中处理
@@ -434,13 +435,13 @@
             showEditMachineModal();
         } catch (error) {
             console.error('获取机器信息失败:', error);
-            alert('获取机器信息失败');
+            showError("失败", '获取机器信息失败');
         }
     }
 
     // 删除机器
     async function deleteMachine(machineId, machineName) {
-        if (!confirm(`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`)) {
+        if (!await showConfirm("删除",`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`)) {
             return;
         }
 
@@ -449,7 +450,7 @@
                 method: 'DELETE'
             });
 
-            alert(result.message);
+            showInfo("提示",result.message);
             await loadMachines();
         } catch (error) {
             // 错误已在apiCall中处理
@@ -459,12 +460,12 @@
     // 刷新机器列表
     async function refreshMachines() {
         await loadMachines();
-        alert('机器列表已刷新');
+        showInfo("提示",'机器列表已刷新');
     }
 
     // 批量启动机器
     async function batchStartMachines() {
-        if (!confirm('确定要启动所有激活的机器吗？')) return;
+        if (!await showConfirm('确认启动', '确定要启动所有激活的机器吗？', 'primary')) return;
 
         try {
             const result = await apiCall('/api/machines/batch-start', {
@@ -472,7 +473,7 @@
                 body: JSON.stringify({})
             });
 
-            alert(result.message);
+            showInfo("返回值",result.message);
             console.log('批量启动结果:', result.results);
         } catch (error) {
             // 错误已在apiCall中处理
@@ -481,7 +482,7 @@
 
     // 批量停止机器
     async function batchStopMachines() {
-        if (!confirm('确定要停止所有机器吗？')) return;
+        if (!await showConfirm('确认停止', '确定要停止所有机器吗？', 'danger')) return;
 
         try {
             const result = await apiCall('/api/machines/batch-stop', {
@@ -489,7 +490,7 @@
                 body: JSON.stringify({})
             });
 
-            alert(result.message);
+            showInfo("返回值",result.message);
             console.log('批量停止结果:', result.results);
         } catch (error) {
             // 错误已在apiCall中处理
@@ -497,7 +498,7 @@
     }
 
     async function syncNewMachines() {
-        if (!confirm('确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。')) {
+        if (!await showConfirm('确认同步', '确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
             return;
         }
 
@@ -514,7 +515,7 @@
             });
 
             if (result.new_machines_count > 0) {
-                alert(`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+                showSuccess("成功",`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
                     `现有机器: ${result.existing_machines_count} 台\n` +
                     `总计机器: ${result.total_machines} 台`);
 
@@ -531,12 +532,12 @@
                     await loadDashboardData();
                 }
             } else {
-                alert(`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+                showInfo("提示", `没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
             }
 
         } catch (error) {
             console.error('同步新机器失败:', error);
-            alert('同步新机器失败，请检查网络连接或稍后重试');
+            showError("失败",'同步新机器失败，请检查网络连接或稍后重试');
         } finally {
             // 恢复按钮状态
             const syncBtn = document.querySelector('button[onclick="syncNewMachines()"]');
