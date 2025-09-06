@@ -308,3 +308,45 @@ def batch_update_labels():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/urls/labels/<string:label>', methods=['DELETE'])
+@login_required
+def delete_label(label):
+    """删除指定标签（将所有使用该标签的URL的标签设为空）"""
+    try:
+        config_id = request.args.get('config_id', type=int)
+
+        # 构建查询
+        query = UrlData.query.filter(UrlData.label == label)
+
+        # 如果指定了配置ID，则按配置过滤
+        if config_id:
+            query = query.filter(UrlData.config_id == config_id)
+
+        urls = query.all()
+
+        if not urls:
+            return jsonify({
+                'error': f'No URLs found with label "{label}"'
+            }), 404
+
+        # 清空标签
+        updated_count = 0
+        for url in urls:
+            url.label = ''
+            url.updated_at = datetime.datetime.now()
+            updated_count += 1
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Successfully deleted label "{label}" from {updated_count} URLs',
+            'updated_count': updated_count,
+            'label': label,
+            'config_id': config_id
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

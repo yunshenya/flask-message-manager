@@ -382,6 +382,9 @@ function updateLabelStats(labelStats) {
                     <button class="btn btn-sm btn-info" onclick="filterByLabel('${stat.label}')" style="width: 100%; margin-top: 0.5rem; font-size: 0.75rem;">
                         筛选此标签
                     </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteLabel('${stat.label}')" style="font-size: 0.75rem;">
+                            🗑️ 删除标签
+                            </button>
                 </div>
             `).join('')}
         </div>
@@ -1237,4 +1240,31 @@ async function syncNewMachinesFromModal() {
 
 function hideVmosMachinesModal() {
     document.getElementById('vmosMachinesModal').style.display = 'none';
+}
+
+async function deleteLabel(label) {
+    if (!currentConfigId) {
+        showError("提示", '请先选择一台机器');
+        return;
+    }
+
+    if (!await showConfirm('确认删除', `确定要删除标签 "${label}" 吗？这将清空所有使用该标签的URL的标签信息。`, 'danger')) {
+        return;
+    }
+
+    try {
+        const response = await apiCall(`/api/urls/labels/${encodeURIComponent(label)}?config_id=${currentConfigId}`, {
+            method: 'DELETE'
+        });
+
+        showSuccess("成功", `标签 "${label}" 已删除，共影响 ${response.updated_count} 个URL`);
+
+        // 刷新数据
+        await loadLabelStats();
+        await loadDashboardData();
+
+    } catch (error) {
+        console.error('删除标签失败:', error);
+        showError("失败", '删除标签失败');
+    }
 }
