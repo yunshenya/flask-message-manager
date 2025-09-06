@@ -18,7 +18,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             stopDurationUpdates();
-            console.log('🔇 页面隐藏，暂停运行时长更新');
         } else {
             if (isWebSocketConnected && currentConfigId) {
                 startDurationUpdates();
@@ -29,12 +28,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// ================================
-// 新增：WebSocket 相关函数
-// ================================
-
 // WebSocket 初始化函数
 function initWebSocket() {
+    // 防止重复初始化
+    if (isWebSocketInitialized && socket && socket.connected) {
+        console.log('WebSocket 已经初始化，跳过重复初始化');
+        return;
+    }
+
     console.log('正在初始化 WebSocket...');
 
     if (typeof io === 'undefined') {
@@ -44,6 +45,12 @@ function initWebSocket() {
     }
 
     try {
+        // 如果已有连接，先断开
+        if (socket) {
+            socket.disconnect();
+            socket = null;
+        }
+
         socket = io('/', {
             transports: ['websocket', 'polling'],
             timeout: 10000,
@@ -51,6 +58,7 @@ function initWebSocket() {
         });
 
         setupWebSocketEvents();
+        isWebSocketInitialized = true;
     } catch (error) {
         console.error('WebSocket 初始化失败:', error);
         showError('连接失败', 'WebSocket 连接初始化失败');
@@ -62,24 +70,32 @@ function setupWebSocketEvents() {
     socket.on('connect', function() {
         console.log('✅ WebSocket 连接成功');
         isWebSocketConnected = true;
-        showSuccess('连接成功', 'WebSocket 实时更新已启用');
 
-        // 连接成功后启动运行时长更新
+        // 防止重复通知
+        if (shouldShowNotification('connect')) {
+            showSuccess('连接成功', 'WebSocket 实时更新已启用');
+        }
+
         startDurationUpdates();
     });
 
     socket.on('disconnect', function(reason) {
         console.log('❌ WebSocket 连接断开:', reason);
         isWebSocketConnected = false;
-        showWarning('连接断开', 'WebSocket 连接已断开，正在尝试重连...');
+        isWebSocketInitialized = false;
 
-        // 断开连接时停止运行时长更新
+        if (shouldShowNotification('disconnect')) {
+            showWarning('连接断开', 'WebSocket 连接已断开，正在尝试重连...');
+        }
+
         stopDurationUpdates();
     });
 
     socket.on('connect_error', function(error) {
         console.error('WebSocket 连接错误:', error);
-        showError('连接错误', 'WebSocket 连接失败，请检查网络');
+        if (shouldShowNotification('error')) {
+            showError('连接错误', 'WebSocket 连接失败，请检查网络');
+        }
     });
 
     // 监听 URL 执行更新
@@ -87,12 +103,13 @@ function setupWebSocketEvents() {
         console.log('📝 收到 URL 执行更新:', data);
         if (data.config_id === currentConfigId) {
             updateSingleUrlItem(data.url_data);
-            updateStatsFromSocket().then(r => {});
-
-            // 更新运行中URL的缓存
+            updateStatsFromSocket();
             updateRunningUrlsCache(data.url_data);
 
-            showInfo('执行更新', `URL "${data.url_data.name}" 执行计数已更新`);
+            // 防止重复通知
+            if (shouldShowNotification('url_executed', data.url_id)) {
+                showInfo('执行更新', `URL "${data.url_data.name}" 执行计数已更新`);
+            }
         }
     });
 
@@ -101,7 +118,10 @@ function setupWebSocketEvents() {
         console.log('📊 收到状态更新:', data);
         if (data.config_id === currentConfigId) {
             updateUrlStatus(data.url_id, data.status);
-            showInfo('状态更新', `URL 状态已更新: ${data.status}`);
+
+            if (shouldShowNotification('status_updated', data.url_id)) {
+                showInfo('状态更新', `URL 状态已更新: ${data.status}`);
+            }
         }
     });
 
@@ -111,7 +131,10 @@ function setupWebSocketEvents() {
         if (data.config_id === currentConfigId) {
             loadDashboardData().then(r => {});
             loadLabelStats().then(r => {});
-            showInfo('标签更新', `URL "${data.url_data.name}" 标签已更新为 "${data.label}"`);
+
+            if (shouldShowNotification('label_updated', data.url_id)) {
+                showInfo('标签更新', `URL "${data.url_data.name}" 标签已更新为 "${data.label}"`);
+            }
         }
     });
 
@@ -132,6 +155,20 @@ function setupWebSocketEvents() {
             updateSingleUrlItem(data.url_data);
         }
     });
+}
+
+function shouldShowNotification(type, urlId = null) {
+    const now = Date.now();
+    const key = urlId ? `${type}_${urlId}` : type;
+    const lastTime = lastNotificationTime.get(key) || 0;
+
+    // 同类型通知间隔至少2秒
+    if (now - lastTime < 2000) {
+        return false;
+    }
+
+    lastNotificationTime.set(key, now);
+    return true;
 }
 
 // 启动运行时长更新
