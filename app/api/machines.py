@@ -7,7 +7,7 @@ from app import db, Config
 from app.models import UrlData
 from app.models.config_data import ConfigData
 from app.auth.decorators import login_required, admin_required
-from app.utils.vmos import get_phone_list
+from app.utils.vmos import get_phone_list, start_app
 
 
 @bp.route('/machines', methods=['GET'])
@@ -195,9 +195,6 @@ def get_machine_stats(machine_id):
 def batch_start_machines():
     """批量启动机器"""
     try:
-        from app.utils.vmos import start_app
-        from app.config import Config
-
         data = request.json
         machine_ids = data.get('machine_ids', [])
 
@@ -401,7 +398,7 @@ def get_vmos_machines_list():
                 'padCode': pade_code,
                 'padName': vmos_machine.get('padName', ''),
                 'goodName': vmos_machine.get('goodName', ''),
-                'status': vmos_machine.get('status', ''),
+                'status': get_vmos_status(vmos_machine.get('status')),
                 'createTime': vmos_machine.get('createTime', ''),
                 'expireTime': vmos_machine.get('expireTime', ''),
             }
@@ -421,3 +418,14 @@ def get_vmos_machines_list():
 
     except Exception as e:
         return jsonify({'error': f'Failed to get VMOS machines list: {str(e)}'}), 500
+
+
+def get_vmos_status(status: int):
+    match status:
+        case 1:
+            return "运行中"
+        case 2:
+            return "关机"
+        case 3:
+            return "开机中"
+    return "未知"
