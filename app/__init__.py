@@ -15,7 +15,16 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db)
 
-    socketio.init_app(app, cors_allowed_origins="*")
+    # 修改 SocketIO 配置，解决升级问题
+    socketio.init_app(app,
+                        cors_allowed_origins="*",
+                        async_mode='eventlet',  # 指定异步模式
+                        logger=True,            # 启用日志
+                        engineio_logger=True,   # 启用引擎日志
+                        ping_timeout=60,        # 增加超时时间
+                        ping_interval=25,       # 设置心跳间隔
+                        transports=['websocket', 'polling']  # 明确指定传输方式
+                        )
 
     from app.main import bp as main_bp
     app.register_blueprint(main_bp)

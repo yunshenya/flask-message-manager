@@ -30,12 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // WebSocket 初始化函数
 function initWebSocket() {
-    // 防止重复初始化
-    if (isWebSocketInitialized && socket && socket.connected) {
-        console.log('WebSocket 已经初始化，跳过重复初始化');
-        return;
-    }
-
     console.log('正在初始化 WebSocket...');
 
     if (typeof io === 'undefined') {
@@ -51,11 +45,19 @@ function initWebSocket() {
             socket = null;
         }
 
+        // 修改连接配置，解决升级问题
         socket = io('/', {
-            transports: ['websocket', 'polling'],
-            timeout: 10000,
-            forceNew: true
-        });
+            transports: ['polling', 'websocket'],  // 先尝试 polling，再升级到 websocket
+            upgrade: true,                         // 允许升级
+            timeout: 20000,                        // 增加超时时间
+            forceNew: true,                        // 强制新连接
+            reconnection: true,                    // 启用重连
+            reconnectionAttempts: 5,               // 重连尝试次数
+            reconnectionDelay: 1000,
+            maxHttpBufferSize: 1e6,               // 增加缓冲区大小
+            pingTimeout: 60000,                    // ping 超时
+            pingInterval: 25000                    // ping 间隔
+    });
 
         setupWebSocketEvents();
         isWebSocketInitialized = true;
@@ -100,47 +102,30 @@ function setupWebSocketEvents() {
 
     // 监听 URL 执行更新
     socket.on('url_executed', function(data) {
-        console.log('📝 收到 URL 执行更新:', data);
         if (data.config_id === currentConfigId) {
             updateSingleUrlItem(data.url_data);
             updateStatsFromSocket();
             updateRunningUrlsCache(data.url_data);
-
-            // 防止重复通知
-            if (shouldShowNotification('url_executed', data.url_id)) {
-                showInfo('执行更新', `URL "${data.url_data.name}" 执行计数已更新`);
-            }
         }
     });
 
     // 监听状态更新
     socket.on('status_updated', function(data) {
-        console.log('📊 收到状态更新:', data);
         if (data.config_id === currentConfigId) {
             updateUrlStatus(data.url_id, data.status);
-
-            if (shouldShowNotification('status_updated', data.url_id)) {
-                showInfo('状态更新', `URL 状态已更新: ${data.status}`);
-            }
         }
     });
 
     // 监听标签更新
     socket.on('label_updated', function(data) {
-        console.log('🏷️ 收到标签更新:', data);
         if (data.config_id === currentConfigId) {
             loadDashboardData().then(r => {});
             loadLabelStats().then(r => {});
-
-            if (shouldShowNotification('label_updated', data.url_id)) {
-                showInfo('标签更新', `URL "${data.url_data.name}" 标签已更新为 "${data.label}"`);
-            }
         }
     });
 
     // 监听URL启动事件
     socket.on('url_started', function(data) {
-        console.log('▶️ 收到 URL 启动事件:', data);
         if (data.config_id === currentConfigId) {
             updateRunningUrlsCache(data.url_data);
             updateSingleUrlItem(data.url_data);
@@ -149,7 +134,6 @@ function setupWebSocketEvents() {
 
     // 监听URL停止事件
     socket.on('url_stopped', function(data) {
-        console.log('⏹️ 收到 URL 停止事件:', data);
         if (data.config_id === currentConfigId) {
             removeFromRunningUrlsCache(data.url_id);
             updateSingleUrlItem(data.url_data);
@@ -178,8 +162,6 @@ function startDurationUpdates() {
         clearInterval(durationUpdateInterval);
     }
 
-    console.log('🕐 启动运行时长实时更新');
-
     // 每秒更新一次运行时长
     durationUpdateInterval = setInterval(() => {
         updateAllRunningDurations();
@@ -191,7 +173,6 @@ function stopDurationUpdates() {
     if (durationUpdateInterval) {
         clearInterval(durationUpdateInterval);
         durationUpdateInterval = null;
-        console.log('🕐 停止运行时长更新');
     }
 }
 
@@ -204,7 +185,6 @@ function updateRunningUrlsCache(urlData) {
             started_at: new Date(urlData.started_at),
             running_duration: urlData.running_duration || 0
         });
-        console.log(`➕ 添加运行中URL到缓存: ${urlData.name}`);
     } else {
         removeFromRunningUrlsCache(urlData.id);
     }
@@ -286,15 +266,12 @@ function initializeRunningUrlsCache(urls) {
             updateRunningUrlsCache(url);
         }
     });
-
-    console.log(`🔄 初始化运行中URL缓存，共 ${runningUrls.size} 个运行中的URL`);
 }
 
 
 function updateSingleUrlItem(urlData) {
     const urlItem = document.querySelector(`[data-url-id="${urlData.id}"]`);
     if (!urlItem) {
-        console.log('未找到对应的 URL 项目，重新加载数据');
         loadDashboardData().then(r => {});
         return;
     }
