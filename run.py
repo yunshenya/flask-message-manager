@@ -1,6 +1,6 @@
 from typing import Any
 
-from app import create_app, db
+from app import create_app, db, Config
 from app.models import User, ConfigData, UrlData
 from app.utils.vmos import get_phone_list
 from waitress import serve
@@ -83,4 +83,7 @@ def init_database():
 if __name__ == '__main__':
     if init_database():
         print("访问地址: http://localhost:5000")
-    serve(app, host='0.0.0.0', port=5000)
+        if Config.DEBUG:
+            app.run(host="0.0.0.0", port=5000, debug=Config.DEBUG)
+        else:
+            serve(app, host='0.0.0.0', port=5000)

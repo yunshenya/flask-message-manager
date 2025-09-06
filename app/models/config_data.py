@@ -1,8 +1,8 @@
 import datetime
 from typing import List
 
-from sqlalchemy import VARCHAR
 from sqlalchemy.orm import relationship, Mapped
+
 from app import db
 
 
@@ -18,7 +18,7 @@ class ConfigData(db.Model):
     description = db.Column(db.Text)
     pade_code = db.Column(db.Text)
     name = db.Column(db.Text)
-    message = db.Column(VARCHAR(100), nullable=False)
+    message = db.Column(db.Text)
 
     urls: Mapped[List["UrlData"]] = relationship(backref='config', cascade='all, delete-orphan')
 
