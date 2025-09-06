@@ -350,3 +350,28 @@ def delete_label(label):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+
+@bp.route('/url/<int:url_id>/remove-label', methods=['POST'])
+@login_required
+def remove_url_label(url_id):
+    """删除单个URL的标签"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        old_label = url.label
+        url.label = ''
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Label removed from URL "{url.name}"',
+            'url_data': url.to_dict(),
+            'old_label': old_label
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

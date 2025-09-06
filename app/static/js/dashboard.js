@@ -237,7 +237,12 @@ function updateUrlList(urls) {
                 <div class="url-info">
                     <div class="url-name">
                         ${url.name}
-                        ${hasLabel ? `<span class="url-label-badge">${url.label}</span>` : ''}
+                        ${hasLabel ? `
+                            <span class="url-label-badge">
+                                ${url.label}
+                                <button class="label-remove-btn" onclick="removeUrlLabel(${url.id}, '${url.name.replace(/'/g, '&#39;')}', '${url.label.replace(/'/g, '&#39;')}')" title="删除标签">×</button>
+                            </span>
+                        ` : ''}
                         ${runningInfo}
                     </div>
                     <div class="url-link">${url.url}</div>
@@ -271,6 +276,7 @@ function updateUrlList(urls) {
                     <div class="url-actions">
                         ${statusButton}
                         ${getControlButtons(url)}
+                        ${hasLabel ? `<button class="btn btn-warning btn-sm" onclick="removeUrlLabel(${url.id}, '${url.name.replace(/'/g, '&#39;')}', '${url.label.replace(/'/g, '&#39;')}')" title="删除标签">🏷️删除标签</button>` : ''}
                         <button class="btn btn-info btn-sm" onclick="editUrl(${url.id})">编辑</button>
                         <button class="btn btn-secondary btn-sm" onclick="resetUrlCount(${url.id}, '${url.name}')">重置</button>
                         <button class="btn btn-warning btn-sm" onclick="deleteUrl(${url.id}, '${url.name}')">删除</button>
@@ -1266,5 +1272,24 @@ async function deleteLabel(label) {
     } catch (error) {
         console.error('删除标签失败:', error);
         showError("失败", '删除标签失败');
+    }
+}
+
+async function removeUrlLabel(urlId, urlName, currentLabel) {
+    if (!await showConfirm('确认删除', `确定要删除URL "${urlName}" 的标签 "${currentLabel}" 吗？`, 'danger')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/url/${urlId}/remove-label`, {
+            method: 'POST'
+        });
+
+        showSuccess("成功", `已删除URL "${urlName}" 的标签`);
+        await loadDashboardData();
+        await loadLabelStats();
+    } catch (error) {
+        console.error('删除URL标签失败:', error);
+        showError('删除URL标签失败:', error)
     }
 }
