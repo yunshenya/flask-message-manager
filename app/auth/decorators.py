@@ -1,11 +1,13 @@
+import os
 from functools import wraps
 from typing import Any
 
 from flask import session, request, jsonify, redirect, url_for, flash
 
-from app import db, Config
+from app import db
 from app.models.user import User
 
+SECRET_TOKEN = os.getenv('API_SECRET_TOKEN', '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9')
 
 def login_required(f):
     @wraps(f)
@@ -49,7 +51,7 @@ def token_required(f):
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
 
-        if token != Config.API_SECRET_TOKEN:
+        if token != SECRET_TOKEN:
             return jsonify({'error': 'Invalid token'}), 401
         return f(*args, **kwargs)
     return decorated
