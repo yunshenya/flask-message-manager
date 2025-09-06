@@ -237,12 +237,7 @@ function updateUrlList(urls) {
                 <div class="url-info">
                     <div class="url-name">
                         ${url.name}
-                        ${hasLabel ? `
-                            <span class="url-label-badge">
-                                ${url.label}
-                                <button class="label-remove-btn" onclick="removeUrlLabel(${url.id}, '${url.name.replace(/'/g, '&#39;')}', '${url.label.replace(/'/g, '&#39;')}')" title="删除标签">×</button>
-                            </span>
-                        ` : ''}
+                        ${hasLabel ? `<span class="url-label-badge">${url.label}</span>` : ''}
                         ${runningInfo}
                     </div>
                     <div class="url-link">${url.url}</div>
