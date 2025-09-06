@@ -5,6 +5,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../static/css/styles.css">
+    <style>
+        .url-item-labeled {
+            border-left: 3px solid #17a2b8;
+            background: linear-gradient(90deg, #f0f9ff 0%, #ffffff 100%);
+        }
+
+        .url-label-badge {
+            background: #17a2b8 !important;
+            color: white !important;
+            padding: 0.1rem 0.3rem !important;
+            border-radius: 3px !important;
+            font-size: 0.75rem !important;
+            margin-left: 0.5rem !important;
+            font-weight: bold;
+        }
+
+        .label-stat-card {
+            transition: transform 0.2s ease;
+        }
+
+        .label-stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .alert {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+    </style>
 </head>
 <body>
 <div class="header">
@@ -90,7 +130,6 @@
             <a href="#" onclick="showMachineManagement()" class="btn btn-info">机器管理</a>
         </div>
         {% endif %}
-        <!-- 状态监控控制面板将通过JavaScript动态添加 -->
     </div>
 
     <!-- 筛选信息显示 -->
@@ -107,21 +146,8 @@
         </div>
     </div>
 
-    <!-- URL列表区域 -->
-    <div class="card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin: 0; color: #333;">📋 URL列表</h3>
-            <div>
-                <button class="btn btn-info btn-sm" onclick="refreshData()">🔄 刷新</button>
-            </div>
-        </div>
-        <div class="url-list" id="urlList">
-            <!-- URL列表将通过JavaScript动态加载 -->
-            <div style="padding: 2rem; text-align: center; color: #666;">
-                <div class="loading-indicator" style="margin: 0 auto 1rem;"></div>
-                正在加载URL列表...
-            </div>
-        </div>
+    <div class="url-list" id="urlList">
+        <!-- URL列表将通过JavaScript动态加载 -->
     </div>
 </div>
 
@@ -204,7 +230,7 @@
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>
-                    <input type="checkbox" id="editIsActive"> 激活状态
+                    <input type="checkbox" id="editUrlIsActive"> 激活状态
                 </label>
             </div>
             <div style="text-align: right;">
@@ -229,53 +255,53 @@
 </div>
 
 <!-- 编辑机器模态框 -->
-<div id="editMachineModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+<div id="dashboardEditMachineModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
         <h3>编辑机器配置</h3>
         <form onsubmit="saveEditedMachine(event)">
-            <input type="hidden" id="editMachineId">
+            <input type="hidden" id="dashboardEditMachineId">
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>机器名称:</label>
-                    <input type="text" id="editMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" id="dashboardEditMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
                     <label>发送的消息:</label>
-                    <input type="text" id="editMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" id="dashboardEditMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>机器代码:</label>
-                    <input type="text" id="editMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
                     <label>描述:</label>
-                    <input type="text" id="editMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>成功时间范围 (秒) - 最小值:</label>
-                    <input type="number" id="editSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="number" id="dashboardEditSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
                     <label>成功时间范围 (秒) - 最大值:</label>
-                    <input type="number" id="editSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="number" id="dashboardEditSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
             </div>
 
             <div style="margin-bottom: 1rem;">
                 <label>重置时间 (小时):</label>
-                <input type="number" id="editResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="number" id="dashboardEditResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
             </div>
 
             <div style="margin-bottom: 1.5rem;">
                 <label style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="checkbox" id="editIsActive"> 激活状态
+                    <input type="checkbox" id="dashboardEditMachineIsActive"> 激活状态
                 </label>
             </div>
 
@@ -287,6 +313,6 @@
     </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="../static/js/dashboard.js"></script>
 </body>
 </html>

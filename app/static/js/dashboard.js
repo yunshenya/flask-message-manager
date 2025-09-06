@@ -45,7 +45,6 @@ let currentEditingMachineId = null;
 let currentConfigId = null;
 let currentConfigData = null;
 let monitoringInterval = null;
-let statusMonitoringInterval = null;
 let lastUpdateTime = Date.now();
 let availableMachines = [];
 
@@ -106,7 +105,7 @@ function switchMachine() {
     if (newConfigId && newConfigId !== currentConfigId) {
         currentConfigId = newConfigId;
         updateCurrentMachineInfo();
-        loadDashboardData().then(r => {});
+        loadDashboardData();
     }
 }
 
@@ -135,98 +134,6 @@ function updateCurrentMachineInfo() {
     }
 }
 
-
-function updateUrlStatusDisplay(urlId, status, isRunning = false) {
-    const statusDisplay = document.getElementById(`status-${urlId}`);
-    if (!statusDisplay) return;
-
-    const statusContent = statusDisplay.querySelector('.status-content');
-    const statusIndicator = statusDisplay.querySelector('.status-indicator');
-
-    // 添加更新动画（保留淡入效果，但更温和）
-    statusDisplay.classList.add('updating');
-
-    setTimeout(() => {
-        // 更新状态内容
-        if (status && status.trim()) {
-            statusContent.textContent = status;
-            statusContent.classList.remove('empty');
-            statusDisplay.classList.remove('empty');
-            statusDisplay.classList.add('has-status');
-
-            // 根据状态内容自动应用样式
-            applyStatusStyle(statusDisplay, statusContent, status);
-        } else {
-            statusContent.textContent = '暂无状态信息';
-            statusContent.classList.add('empty');
-            statusDisplay.classList.remove('has-status');
-            statusDisplay.classList.add('empty');
-            clearStatusStyles(statusDisplay, statusContent);
-        }
-
-        // 更新运行指示器（移除动画类）
-        if (isRunning) {
-            statusIndicator.classList.add('active');
-            // 移除可能的动画类
-            statusIndicator.classList.remove('pulse', 'blink');
-        } else {
-            statusIndicator.classList.remove('active');
-            // 移除可能的动画类
-            statusIndicator.classList.remove('pulse', 'blink');
-        }
-
-        // 移除动画类
-        statusDisplay.classList.remove('updating');
-        // 确保移除其他可能的动画类
-        statusDisplay.classList.remove('pulse', 'urgent');
-
-    }, 200); // 减少延迟时间，使更新更快
-}
-
-
-function applyStatusStyle(statusDisplay, statusContent, status) {
-    // 清除所有状态样式
-    clearStatusStyles(statusDisplay, statusContent);
-
-    const statusLower = status.toLowerCase();
-
-    if (statusLower.includes('成功') || statusLower.includes('完成') || status.includes('✅')) {
-        statusDisplay.classList.add('status-success');
-        statusContent.classList.add('status-success');
-    } else if (statusLower.includes('错误') || statusLower.includes('失败') || status.includes('❌')) {
-        statusDisplay.classList.add('status-error');
-        statusContent.classList.add('status-error');
-    } else if (statusLower.includes('警告') || statusLower.includes('注意') || status.includes('⚠️')) {
-        statusDisplay.classList.add('status-warning');
-        statusContent.classList.add('status-warning');
-    } else if (statusLower.includes('信息') || statusLower.includes('提示') || status.includes('ℹ️')) {
-        statusDisplay.classList.add('status-info');
-        statusContent.classList.add('status-info');
-    }
-
-    // 确保不添加任何动画相关的类
-    statusDisplay.classList.remove('pulse', 'urgent', 'blink');
-}
-
-// 修改后的函数：清除状态样式（包括动画类）
-function clearStatusStyles(statusDisplay, statusContent) {
-    const statusClasses = ['status-success', 'status-warning', 'status-error', 'status-info'];
-    const animationClasses = ['pulse', 'urgent', 'blink', 'shake']; // 添加动画类列表
-
-    statusClasses.forEach(cls => {
-        statusDisplay.classList.remove(cls);
-        statusContent.classList.remove(cls);
-    });
-
-    // 移除动画类
-    animationClasses.forEach(cls => {
-        statusDisplay.classList.remove(cls);
-        statusContent.classList.remove(cls);
-    });
-}
-
-
-
 // ================================
 // 数据加载和状态监控
 // ================================
@@ -245,9 +152,6 @@ async function loadDashboardData() {
         currentConfigData = statusData.config;
         updateStatistics(statusData);
         updateUrlList(urlsData.urls);
-
-        // 更新所有URL的状态显示
-        updateAllUrlStatusDisplays(urlsData.urls);
 
         // 加载标签统计
         await loadLabelStats();
@@ -302,10 +206,10 @@ function updateUrlList(urls) {
                     </div>
                     <div class="url-link">${url.url}</div>
                     
-                    <!-- 新增的实时状态显示框 -->
+                    <!-- 实时状态显示 -->
                     <div class="status-display ${url.status && url.status.trim() ? 'has-status' : 'empty'}" id="status-${url.id}">
                         <div class="status-indicator ${url.is_running ? 'active' : ''}"></div>
-                        <div class="status-label">实时状态</div>
+                        <div class="status-label">状态</div>
                         <div class="status-content ${url.status && url.status.trim() ? '' : 'empty'}">
                             ${url.status && url.status.trim() ? url.status : '暂无状态信息'}
                         </div>
@@ -483,7 +387,7 @@ function clearFilter() {
         filterInfo.innerHTML = '';
     }
 
-    loadDashboardData().then(r => {});
+    loadDashboardData();
 }
 
 // ================================
@@ -794,7 +698,7 @@ async function stopAllMachines() {
 // ================================
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
-    loadMachineManagementList().then(r => {});
+    loadMachineManagementList();
 }
 
 function hideMachineManagement() {
@@ -1017,122 +921,6 @@ function refreshData() {
 }
 
 // ================================
-// 状态监控控制面板 - 新增功能
-// ================================
-function addStatusMonitoringControls() {
-    const actionsContainer = document.querySelector('.actions');
-    if (!actionsContainer) return;
-
-    // 检查是否已经添加了控制面板
-    if (document.getElementById('statusMonitoringCard')) return;
-
-    const statusControlCard = document.createElement('div');
-    statusControlCard.className = 'action-card';
-    statusControlCard.id = 'statusMonitoringCard';
-    statusControlCard.innerHTML = `
-        <h3>🔍 状态监控</h3>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <button class="btn btn-info btn-sm" onclick="startStatusMonitoring(1000)">高频 (1秒)</button>
-            <button class="btn btn-primary btn-sm" onclick="startStatusMonitoring(2000)">正常 (2秒)</button>
-            <button class="btn btn-success btn-sm" onclick="startStatusMonitoring(5000)">低频 (5秒)</button>
-            <button class="btn btn-danger btn-sm" onclick="stopStatusMonitoring()">停止监控</button>
-        </div>
-        <div style="margin-top: 0.5rem;">
-            <small id="monitoringStatus" style="color: #666;">监控状态: 未启动</small>
-        </div>
-    `;
-
-    actionsContainer.appendChild(statusControlCard);
-}
-
-// 更新监控状态显示
-function updateMonitoringStatus(isActive, interval = 0) {
-    const statusElement = document.getElementById('monitoringStatus');
-    if (statusElement) {
-        if (isActive) {
-            statusElement.textContent = `监控状态: 运行中 (${interval / 1000}秒间隔)`;
-            statusElement.style.color = '#28a745';
-        } else {
-            statusElement.textContent = '监控状态: 未启动';
-            statusElement.style.color = '#6c757d';
-        }
-    }
-}
-
-// 重新定义状态监控函数，加入状态显示更新
-function startStatusMonitoring(intervalMs = 2000) {
-    if (statusMonitoringInterval) {
-        clearInterval(statusMonitoringInterval);
-    }
-
-    console.log(`开始状态监控，刷新间隔: ${intervalMs}ms`);
-    updateMonitoringStatus(true, intervalMs);
-
-    statusMonitoringInterval = setInterval(async () => {
-        if (document.hidden || !currentConfigId) return;
-
-        try {
-            // 只获取URL数据进行状态更新，减少API调用
-            await apiCall(`/api/config/${currentConfigId}/urls`);
-        } catch (error) {
-            console.error('状态监控失败:', error);
-        }
-    }, intervalMs);
-}
-
-// 重新定义停止状态监控函数
-function stopStatusMonitoring() {
-    if (statusMonitoringInterval) {
-        clearInterval(statusMonitoringInterval);
-        statusMonitoringInterval = null;
-        console.log('状态监控已停止');
-        updateMonitoringStatus(false);
-    }
-}
-
-// ================================
-// 测试状态显示功能 - 开发调试用
-// ================================
-function testStatusDisplay() {
-    if (!currentConfigId) {
-        alert('请先选择一台机器');
-        return;
-    }
-
-    // 模拟状态更新序列
-    const testStatuses = [
-        '🔄 正在连接 Telegram 服务器...',
-        '✅ 连接成功，正在验证权限...',
-        '📝 开始发送消息...',
-        '⏳ 发送中: 消息 1/3',
-        '✅ 消息 1 发送成功',
-        '⏳ 发送中: 消息 2/3',
-        '✅ 消息 2 发送成功',
-        '⏳ 发送中: 消息 3/3',
-        '✅ 所有消息发送完成！',
-        ''
-    ];
-
-    let index = 0;
-    const testInterval = setInterval(() => {
-        if (index < testStatuses.length) {
-            // 获取第一个URL进行测试
-            const firstUrlElement = document.querySelector('.url-item');
-            if (firstUrlElement) {
-                const urlId = firstUrlElement.querySelector('.status-display')?.id?.split('-')[1];
-                if (urlId) {
-                    updateUrlStatusDisplay(parseInt(urlId), testStatuses[index], index < testStatuses.length - 1);
-                }
-            }
-            index++;
-        } else {
-            clearInterval(testInterval);
-            console.log('状态测试完成');
-        }
-    }, 2000);
-}
-
-// ================================
 // 页面初始化
 // ================================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1140,15 +928,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (currentConfigId) {
         await loadDashboardData();
-        // 启动状态监控（2秒间隔更新状态）
-        startStatusMonitoring(2000);
     }
 
-    // 启动常规数据监控（5秒间隔）
     startMonitoring(5000);
-
-    // 添加状态监控控制面板
-    addStatusMonitoringControls();
 
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden && currentConfigId) {
@@ -1157,8 +939,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 });
 
-// 在页面卸载时清理所有定时器
 window.addEventListener('beforeunload', () => {
     stopMonitoring();
-    stopStatusMonitoring();
 });

@@ -11,7 +11,7 @@ from app.utils.vmos import stop_app, start_app
 
 
 @bp.route("/callback", methods=["POST"])
-def callback_v2():
+def callback():
     data = request.get_json()
     if not data:
         return jsonify({"error": "Invalid JSON data"}), 400
