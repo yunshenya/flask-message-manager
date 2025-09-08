@@ -4,8 +4,12 @@
     <title>消息管理系统 - 仪表板</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/css/styles.css">
+    <link rel="stylesheet" href="../static/css/common.css">
+    <link rel="stylesheet" href="../static/css/dashboard.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="../static/js/notification.js"></script>
+    <script src="../static/js/common.js"></script>
+    <script src="../static/js/dashboard.js"></script>
 </head>
 <body>
 <div class="header">
@@ -54,11 +58,11 @@
     <div class="stats">
         <div class="stat-card">
             <div class="stat-number" id="totalUrls">-</div>
-            <div class="stat-label">总URL数</div>
+            <div class="stat-label">总群数</div>
         </div>
         <div class="stat-card">
             <div class="stat-number" id="availableUrls">-</div>
-            <div class="stat-label">可执行URL</div>
+            <div class="stat-label">可发送消息群聊</div>
         </div>
         <div class="stat-card">
             <div class="stat-number" id="totalExecutions">-</div>
@@ -66,14 +70,14 @@
         </div>
         <div class="stat-card">
             <div class="stat-number" id="completedUrls">-</div>
-            <div class="stat-label">已完成URL</div>
+            <div class="stat-label">已完成群聊</div>
         </div>
     </div>
 
     <div class="actions">
         <div class="action-card">
             <h3>URL管理</h3>
-            <a href="#" onclick="showAddUrlModal()" class="btn btn-success">添加URL</a>
+            <a href="#" onclick="showAddUrlModal()" class="btn btn-success">添加新群</a>
             <a href="#" onclick="refreshData()" class="btn btn-primary">刷新数据</a>
             <a href="#" onclick="resetAllUrls()" class="btn btn-warning">重置所有计数</a>
         </div>
@@ -278,7 +282,5 @@
         </div>
     </div>
 </div>
-<script src="../static/js/notification.js"></script>
-<script src="../static/js/dashboard.js"></script>
 </body>
 </html>

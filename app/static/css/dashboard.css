@@ -258,7 +258,7 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     color: #495057;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1px;
     margin-bottom: 0.25rem;
     display: flex;
     align-items: center;
@@ -613,22 +613,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     width: 100%;
 }
 
-.notification {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    margin-bottom: 12px;
-    padding: 16px 20px;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    border-left: 4px solid #007bff;
-    transform: translateX(420px);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
-    max-height: 0;
-    overflow: hidden;
-}
 
 .notification.show {
     transform: translateX(0);
@@ -681,22 +665,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
     word-wrap: break-word;
 }
 
-.notification-close {
-    background: none;
-    border: none;
-    font-size: 16px;
-    color: #999;
-    cursor: pointer;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
 
 .notification-close:hover {
     background: #f0f0f0;
@@ -705,22 +673,6 @@ body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f
 
 .notification-close::before { content: "×"; }
 
-/* 确认对话框样式 */
-.confirm-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: all 0.3s ease;
-}
 
 .confirm-overlay.show {
     opacity: 1;
