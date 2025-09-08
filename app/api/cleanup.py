@@ -216,3 +216,18 @@ def get_available_configs():
         ])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+
+@bp.route('/cleanup-tasks/<int:task_id>', methods=['get'])
+@admin_required
+def get_cleanup_task(task_id):
+    """获取单个配置列表"""
+    try:
+        task = db.session.get(CleanupTask, task_id)
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+        return jsonify(task.to_dict())
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
