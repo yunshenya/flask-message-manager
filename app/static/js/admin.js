@@ -499,10 +499,18 @@ async function saveCleanupTask(event) {
     // 获取目标配置
     const select = document.getElementById('cleanupTargetConfigs');
     const selectedOptions = Array.from(select.selectedOptions);
-    const targetConfigs = selectedOptions
+    const selectedValues = selectedOptions
         .map(option => option.value)
-        .filter(value => value !== '')
-        .map(value => parseInt(value));
+        .filter(value => value !== '');
+
+    let targetConfigs;
+
+    // 如果没有选择任何机器，或者选择了"全部机器"，则传递所有可用配置的ID
+    if (selectedValues.length === 0) {
+        targetConfigs = availableConfigs.map(config => config.id);
+    } else {
+        targetConfigs = selectedValues.map(value => parseInt(value));
+    }
 
     // 自动生成任务名称
     const timeStr = document.getElementById('cleanupTaskTime').value;
@@ -512,7 +520,7 @@ async function saveCleanupTask(event) {
         'counts': '次数'
     };
     const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
-    const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
+    const targetText = selectedValues.length === 0 ? '全部机器' : `${targetConfigs.length}台机器`;
     const autoName = `${timeStr} 清理${typesText} (${targetText})`;
 
     const data = {
@@ -520,7 +528,7 @@ async function saveCleanupTask(event) {
         description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
         schedule_time: document.getElementById('cleanupTaskTime').value,
         cleanup_types: cleanupTypes,
-        target_configs: targetConfigs.length > 0 ? targetConfigs : null,
+        target_configs: targetConfigs, // 总是传递具体的ID列表
         is_enabled: document.getElementById('cleanupTaskEnabled').checked
     };
 
@@ -548,32 +556,60 @@ async function saveCleanupTask(event) {
 
 async function editCleanupTask(taskId) {
     try {
-        const task = await apiCall(`/api/cleanup-tasks/${taskId}`);
+        const task = await apiCall(`/api/cleanup-tasks/${taskId}`, {
+            method: 'GET'
+        });
+
+        console.log('获取到的任务数据:', task); // 调试用
+
+        // 先加载可用配置
+        await loadAvailableConfigs();
 
         // 填充表单
         document.getElementById('cleanupTaskId').value = task.id;
-        document.getElementById('cleanupTaskName').value = task.name;
         document.getElementById('cleanupTaskTime').value = task.schedule_time;
-        document.getElementById('cleanupTaskDesc').value = task.description || '';
         document.getElementById('cleanupTaskEnabled').checked = task.is_enabled;
 
-        // 设置清理类型
-        document.getElementById('cleanupStatus').checked = task.cleanup_types.includes('status');
-        document.getElementById('cleanupLabel').checked = task.cleanup_types.includes('label');
-        document.getElementById('cleanupCounts').checked = task.cleanup_types.includes('counts');
+        // 清空所有复选框
+        document.getElementById('cleanupStatus').checked = false;
+        document.getElementById('cleanupLabel').checked = false;
+        document.getElementById('cleanupCounts').checked = false;
 
-        // 加载配置并设置选中状态
-        await loadAvailableConfigs();
-        if (task.target_configs) {
-            const select = document.getElementById('cleanupTargetConfigs');
+        // 设置清理类型
+        if (task.cleanup_types && Array.isArray(task.cleanup_types)) {
+            if (task.cleanup_types.includes('status')) {
+                document.getElementById('cleanupStatus').checked = true;
+            }
+            if (task.cleanup_types.includes('label')) {
+                document.getElementById('cleanupLabel').checked = true;
+            }
+            if (task.cleanup_types.includes('counts')) {
+                document.getElementById('cleanupCounts').checked = true;
+            }
+        }
+
+        // 设置目标配置选择
+        const select = document.getElementById('cleanupTargetConfigs');
+        // 先清空所有选择
+        Array.from(select.options).forEach(option => {
+            option.selected = false;
+        });
+
+        // 如果有目标配置，设置选中状态
+        if (task.target_configs && Array.isArray(task.target_configs)) {
             Array.from(select.options).forEach(option => {
-                option.selected = task.target_configs.includes(parseInt(option.value));
+                if (option.value && task.target_configs.includes(parseInt(option.value))) {
+                    option.selected = true;
+                }
             });
         }
 
+        console.log('表单设置完成'); // 调试用
         document.getElementById('addCleanupTaskModal').style.display = 'block';
+
     } catch (error) {
-        showError('加载失败', '获取任务信息失败');
+        console.error('编辑任务失败:', error); // 调试用
+        showError('加载失败', '获取任务信息失败: ' + error.message);
     }
 }
 

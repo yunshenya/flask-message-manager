@@ -26,7 +26,6 @@ def _execute_task(task: CleanupTask):
                         for url in config.urls:
                             url.status = ''
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
                 case "label":
                     for config_id in config_id_list:
@@ -34,7 +33,6 @@ def _execute_task(task: CleanupTask):
                         for url in config.urls:
                             url.label = ''
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
                 case "counts":
                     for config_id in config_id_list:
@@ -42,10 +40,8 @@ def _execute_task(task: CleanupTask):
                         for url in config.urls:
                             url.current_count = 0
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
         affected_rows = len(success_list)
-
         # 更新任务状态
         task.last_run = datetime.datetime.now()
         task.calculate_next_run()

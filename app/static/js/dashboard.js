@@ -1656,10 +1656,22 @@ async function saveDashboardCleanupTask(event) {
     // 获取目标配置
     const select = document.getElementById('dashboardCleanupTargetConfigs');
     const selectedOptions = Array.from(select.selectedOptions);
-    const targetConfigs = selectedOptions
+    const selectedValues = selectedOptions
         .map(option => option.value)
-        .filter(value => value !== '')
-        .map(value => parseInt(value));
+        .filter(value => value !== '');
+
+    let targetConfigs;
+
+    // 如果没有选择任何机器，或者选择了"全部机器"，则传递所有可用配置的ID
+    if (selectedValues.length === 0) {
+        // 确保 dashboardAvailableConfigs 已加载
+        if (!dashboardAvailableConfigs || dashboardAvailableConfigs.length === 0) {
+            await loadDashboardAvailableConfigs();
+        }
+        targetConfigs = dashboardAvailableConfigs.map(config => config.id);
+    } else {
+        targetConfigs = selectedValues.map(value => parseInt(value));
+    }
 
     // 根据时间和清理类型自动生成任务名称
     const timeStr = document.getElementById('dashboardCleanupTaskTime').value;
@@ -1669,7 +1681,7 @@ async function saveDashboardCleanupTask(event) {
         'counts': '次数'
     };
     const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
-    const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
+    const targetText = selectedValues.length === 0 ? '全部机器' : `${targetConfigs.length}台机器`;
     const autoName = `${timeStr} 清理${typesText} (${targetText})`;
 
     const data = {
@@ -1677,7 +1689,7 @@ async function saveDashboardCleanupTask(event) {
         description: `每日${timeStr}清理${typesText}`,
         schedule_time: document.getElementById('dashboardCleanupTaskTime').value,
         cleanup_types: cleanupTypes,
-        target_configs: targetConfigs.length > 0 ? targetConfigs : null,
+        target_configs: targetConfigs,
         is_enabled: document.getElementById('dashboardCleanupTaskEnabled').checked
     };
 

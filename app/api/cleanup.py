@@ -184,7 +184,6 @@ def execute_cleanup_task(task_id):
                         for url in config.urls:
                             url.status = ''
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
                 case "label":
                     for config_id in config_id_list:
@@ -192,7 +191,6 @@ def execute_cleanup_task(task_id):
                         for url in config.urls:
                             url.label = ''
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
                 case "counts":
                     for config_id in config_id_list:
@@ -200,7 +198,6 @@ def execute_cleanup_task(task_id):
                         for url in config.urls:
                             url.current_count = 0
                             url.updated_at = datetime.datetime.now()
-                            db.session.commit()
                             success_list.append(url.id)
 
         affected_rows = len(success_list)
@@ -237,7 +234,7 @@ def get_available_configs():
 
 
 
-@bp.route('/cleanup-tasks/<int:task_id>', methods=['get'])
+@bp.route('/cleanup-tasks/<int:task_id>', methods=['GET'])
 @admin_required
 def get_cleanup_task(task_id):
     """获取单个配置列表"""
