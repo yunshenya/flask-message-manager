@@ -2,11 +2,11 @@ import datetime
 from typing import Any
 
 from flask import jsonify, request
-from app.api import bp
+
 from app import db, Config
-from app.models import UrlData
-from app.models.config_data import ConfigData
+from app.api import bp
 from app.auth.decorators import login_required, admin_required
+from app.models.config_data import ConfigData
 from app.utils.vmos import get_phone_list, start_app
 
 
@@ -307,14 +307,6 @@ def sync_new_machines():
                 'existing_machines_count': len(existing_codes)
             })
 
-        # 默认的Telegram URL配置
-        default_telegram_urls = [
-            {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
-            {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
-            {'url': 'https://t.me/lianheshequ424', 'name': '联合社区', 'duration': 30, 'max_num': 3},
-            {'url': 'https://t.me/make_friends1', 'name': 'make_friends', 'duration': 30, 'max_num': 3}
-        ]
-
         created_machines = []
 
         # 创建新机器配置
@@ -332,26 +324,13 @@ def sync_new_machines():
                 )
 
                 db.session.add(new_machine)
-                db.session.flush()  # 获取生成的ID
-
-                # 为新机器创建默认URL配置
-                for url_data in default_telegram_urls:
-                    url = UrlData(
-                        config_id=new_machine.id,
-                        url=url_data['url'],
-                        name=url_data['name'],
-                        duration=url_data['duration'],
-                        max_num=url_data['max_num'],
-                        is_active=True
-                    )
-                    db.session.add(url)
+                db.session.flush()
 
                 created_machines.append({
                     'id': new_machine.id,
                     'name': new_machine.name,
                     'pade_code': new_machine.pade_code,
                     'description': new_machine.description,
-                    'urls_created': len(default_telegram_urls)
                 })
 
             except Exception as e:
