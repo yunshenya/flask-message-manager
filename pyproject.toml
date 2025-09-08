@@ -1,7 +1,7 @@
 [project]
 name = "flask-message-manager"
 version = "0.1.0"
-description = "Add your description here"
+description = "manager"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

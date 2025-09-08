@@ -15,7 +15,9 @@ def login_required(f):
                 return jsonify({'error': 'Authentication required', 'login_url': '/login'}), 401
             return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
+
     return decorated_function
+
 
 def admin_required(f):
     @wraps(f)
@@ -32,6 +34,7 @@ def admin_required(f):
             flash('需要管理员权限')
             return redirect(url_for('main.dashboard'))
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -52,4 +55,5 @@ def token_required(f):
         if token != Config.API_SECRET_TOKEN:
             return jsonify({'error': 'Invalid token'}), 401
         return f(*args, **kwargs)
+
     return decorated

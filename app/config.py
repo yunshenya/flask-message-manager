@@ -1,8 +1,10 @@
 import os
+
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '..', '.env'))
+
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or '1234567'
@@ -13,7 +15,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = SQLALCHEMY_TRACK_MODIFICATIONS_str.lower() == 'true' if SQLALCHEMY_TRACK_MODIFICATIONS_str else False
     PKG_NAME = os.environ.get('PKG_NAME')
     TG_PKG_NAME = os.environ.get('TG_PKG_NAME')
-    API_SECRET_TOKEN=os.getenv("API_SECRET_TOKEN")
+    API_SECRET_TOKEN = os.getenv("API_SECRET_TOKEN")
     DEBUG_str = os.getenv('DEBUG')
     DEBUG = DEBUG_str.lower() == 'true' if DEBUG_str else False
     ACCESS_KEY = os.getenv('ACCESS_KEY')

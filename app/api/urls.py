@@ -1,11 +1,13 @@
 import datetime
 
 from flask import jsonify, request
-from app.api import bp
+
 from app import db
+from app.api import bp
+from app.auth.decorators import login_required, token_required
 from app.models.config_data import ConfigData
 from app.models.url_data import UrlData
-from app.auth.decorators import login_required, token_required
+
 
 @bp.route('/url', methods=['POST'])
 @login_required
@@ -46,6 +48,7 @@ def create_url():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/url/<int:url_id>/execute', methods=['POST'])
 @login_required
@@ -90,6 +93,7 @@ def get_url(url_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/url/<int:url_id>', methods=['PUT'])
 @login_required
 def update_url(url_id):
@@ -103,12 +107,10 @@ def update_url(url_id):
         if not data:
             return jsonify({'error': 'No data provided'}), 400
 
-        # 更新字段（不包含label，label只能由后端系统设置）
         if 'url' in data:
             url.url = data['url']
         if 'name' in data:
             url.name = data['name']
-        # label字段不允许通过此接口更新
         if 'duration' in data:
             url.duration = data['duration']
         if 'max_num' in data:
@@ -126,6 +128,7 @@ def update_url(url_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/url/<int:url_id>', methods=['DELETE'])
 @login_required
@@ -147,6 +150,7 @@ def delete_url(url_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/url/<int:url_id>/reset', methods=['POST'])
 @login_required
 def reset_url_count(url_id):
@@ -167,6 +171,7 @@ def reset_url_count(url_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/urls/by-label/<string:label>', methods=['GET'])
 @login_required
@@ -201,6 +206,7 @@ def get_urls_by_label(label):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/urls/labels', methods=['GET'])
 @login_required
@@ -249,6 +255,7 @@ def get_all_labels():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/urls/batch-update-label', methods=['POST'])
 @token_required  # 只有后端系统可以调用
@@ -350,7 +357,6 @@ def delete_label(label):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
-
 
 
 @bp.route('/url/<int:url_id>/remove-label', methods=['POST'])

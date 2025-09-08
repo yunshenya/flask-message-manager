@@ -3,9 +3,9 @@
 <head>
     <title>消息管理系统 - 仪表板</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../static/css/common.css">
-    <link rel="stylesheet" href="../static/css/dashboard.css">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <link href="../static/css/common.css" rel="stylesheet">
+    <link href="../static/css/dashboard.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="../static/js/notification.js"></script>
     <script src="../static/js/common.js"></script>
@@ -17,7 +17,7 @@
     <div class="user-info">
         <span>欢迎, {{ current_user.username }}</span>
         {% if current_user.is_admin %}<span class="btn btn-warning">管理员</span>{% endif %}
-        <a href="{{ url_for('auth.logout') }}" class="btn btn-danger">退出</a>
+        <a class="btn btn-danger" href="{{ url_for('auth.logout') }}">退出</a>
     </div>
 </div>
 
@@ -35,13 +35,14 @@
         <h3>🖥️ 机器管理</h3>
         <div class="machine-select-group">
             <label for="machineSelect">选择机器:</label>
-            <select id="machineSelect" class="machine-select" onchange="switchMachine()">
+            <select class="machine-select" id="machineSelect" onchange="switchMachine()">
                 <option value="">加载中...</option>
             </select>
             <button class="btn btn-info btn-sm" onclick="refreshMachineList()">
                 <span id="refreshIcon">🔄</span> 刷新
             </button>
-            <button class="btn btn-warning btn-sm" onclick="editCurrentMachine()" id="editCurrentBtn" style="display: none;">
+            <button class="btn btn-warning btn-sm" id="editCurrentBtn" onclick="editCurrentMachine()"
+                    style="display: none;">
                 ✏️ 编辑当前机器
             </button>
         </div>
@@ -77,22 +78,22 @@
     <div class="actions">
         <div class="action-card">
             <h3>群聊管理</h3>
-            <a href="#" onclick="showAddUrlModal()" class="btn btn-success">添加新群</a>
-            <a href="#" onclick="refreshData()" class="btn btn-primary">刷新数据</a>
-            <a href="#" onclick="resetAllUrls()" class="btn btn-warning">重置所有计数</a>
+            <a class="btn btn-success" href="#" onclick="showAddUrlModal()">添加新群</a>
+            <a class="btn btn-primary" href="#" onclick="refreshData()">刷新数据</a>
+            <a class="btn btn-warning" href="#" onclick="resetAllUrls()">重置所有计数</a>
         </div>
         <div class="action-card">
             <h3>机器控制</h3>
-            <a href="#" onclick="startCurrentMachine()" class="btn btn-success">启动当前机器</a>
-            <a href="#" onclick="stopCurrentMachine()" class="btn btn-danger">停止当前机器</a>
-            <a href="#" onclick="startAllMachines()" class="btn btn-success">启动全部机器</a>
-            <a href="#" onclick="stopAllMachines()" class="btn btn-danger">停止全部机器</a>
+            <a class="btn btn-success" href="#" onclick="startCurrentMachine()">启动当前机器</a>
+            <a class="btn btn-danger" href="#" onclick="stopCurrentMachine()">停止当前机器</a>
+            <a class="btn btn-success" href="#" onclick="startAllMachines()">启动全部机器</a>
+            <a class="btn btn-danger" href="#" onclick="stopAllMachines()">停止全部机器</a>
         </div>
         {% if current_user.is_admin %}
         <div class="action-card">
             <h3>系统管理</h3>
-            <a href="/admin" class="btn btn-warning">用户管理</a>
-            <a href="#" onclick="showMachineManagement()" class="btn btn-info">机器管理</a>
+            <a class="btn btn-warning" href="/admin">用户管理</a>
+            <a class="btn btn-info" href="#" onclick="showMachineManagement()">机器管理</a>
         </div>
         {% endif %}
     </div>
@@ -101,7 +102,8 @@
     <div id="filterInfo"></div>
 
     <!-- 标签统计区域 -->
-    <div class="card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+    <div class="card"
+         style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0; color: #333;">🏷️ 标签统计</h3>
             <button class="btn btn-info btn-sm" onclick="loadLabelStats()">刷新标签统计</button>
@@ -117,88 +119,100 @@
 </div>
 
 <!-- 消息详情模态框 -->
-<div id="messageDetailModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002;">
+<div id="messageDetailModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1002;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
         <h3 id="messageDetailTitle">消息详情</h3>
         <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0; max-height: 300px; overflow-y: auto;">
             <p id="messageDetailContent" style="white-space: pre-wrap; margin: 0; line-height: 1.5;"></p>
         </div>
         <div style="text-align: right;">
-            <button onclick="hideMessageDetail()" class="btn btn-secondary">关闭</button>
+            <button class="btn btn-secondary" onclick="hideMessageDetail()">关闭</button>
         </div>
     </div>
 </div>
 
 <!-- 添加URL模态框 -->
-<div id="addUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+<div id="addUrlModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
         <h3>添加新群聊</h3>
         <form onsubmit="addUrl(event)">
             <div style="margin-bottom: 1rem;">
                 <label>群聊链接或群名:</label>
-                <input type="text" id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="text">
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>名称:</label>
-                <input type="text" id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="text">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>持续时间(秒):</label>
-                    <input type="number" id="newDuration" value="30" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="newDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
+                           value="30">
                 </div>
                 <div>
                     <label>最大执行次数:</label>
-                    <input type="number" id="newMaxNum" value="3" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="newMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
+                           value="3">
                 </div>
             </div>
             <div style="text-align: right;">
-                <button type="button" onclick="hideAddUrlModal()" class="btn btn-danger">取消</button>
-                <button type="submit" class="btn btn-success">添加</button>
+                <button class="btn btn-danger" onclick="hideAddUrlModal()" type="button">取消</button>
+                <button class="btn btn-success" type="submit">添加</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- 编辑URL模态框 -->
-<div id="editUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+<div id="editUrlModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
         <h3>编辑群聊</h3>
         <form onsubmit="saveEditedUrl(event)">
-            <input type="hidden" id="editUrlId">
+            <input id="editUrlId" type="hidden">
             <div style="margin-bottom: 1rem;">
                 <label>群聊链接或名称</label>
-                <input type="text" id="editUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input id="editUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="text">
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>名称:</label>
-                <input type="text" id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="text">
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>持续时间(秒):</label>
-                    <input type="number" id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="number">
                 </div>
                 <div>
                     <label>最大执行次数:</label>
-                    <input type="number" id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="number">
                 </div>
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>
-                    <input type="checkbox" id="editUrlIsActive"> 激活状态
+                    <input id="editUrlIsActive" type="checkbox"> 激活状态
                 </label>
             </div>
             <div style="text-align: right;">
-                <button type="button" onclick="hideEditUrlModal()" class="btn btn-danger">取消</button>
-                <button type="submit" class="btn btn-success">保存</button>
+                <button class="btn btn-danger" onclick="hideEditUrlModal()" type="button">取消</button>
+                <button class="btn btn-success" type="submit">保存</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- 机器管理模态框 -->
-<div id="machineManagementModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+<div id="machineManagementModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 80vh; overflow-y: auto;">
         <h3>机器管理</h3>
         <div id="machineList">
@@ -206,76 +220,87 @@
         </div>
         <div style="text-align: right; margin-top: 2rem;">
             <hr style="margin: 1rem 0;">
-            <button onclick="showVmosMachinesList()" class="btn btn-danger">📋 查看VMOS机器</button>
-            <button onclick="syncNewMachines()" class="btn btn-danger">🔄 同步新机器</button>
-            <button onclick="hideMachineManagement()" class="btn btn-danger">关闭</button>
+            <button class="btn btn-danger" onclick="showVmosMachinesList()">📋 查看VMOS机器</button>
+            <button class="btn btn-danger" onclick="syncNewMachines()">🔄 同步新机器</button>
+            <button class="btn btn-danger" onclick="hideMachineManagement()">关闭</button>
         </div>
     </div>
 </div>
 
 <!-- 编辑机器模态框 -->
-<div id="dashboardEditMachineModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+<div id="dashboardEditMachineModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
         <h3>编辑机器配置</h3>
         <form onsubmit="saveEditedMachine(event)">
-            <input type="hidden" id="dashboardEditMachineId">
+            <input id="dashboardEditMachineId" type="hidden">
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>机器名称:</label>
-                    <input type="text" id="dashboardEditMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
                 </div>
                 <div>
                     <label>发送的消息:</label>
-                    <input type="text" id="dashboardEditMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>机器代码:</label>
-                    <input type="text" id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
                 </div>
                 <div>
                     <label>描述:</label>
-                    <input type="text" id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>成功时间范围 (秒) - 最小值:</label>
-                    <input type="number" id="dashboardEditSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="number">
                 </div>
                 <div>
                     <label>成功时间范围 (秒) - 最大值:</label>
-                    <input type="number" id="dashboardEditSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                    <input id="dashboardEditSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="number">
                 </div>
             </div>
 
             <div style="margin-bottom: 1rem;">
                 <label>重置时间 (小时):</label>
-                <input type="number" id="dashboardEditResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <input id="dashboardEditResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="number">
             </div>
 
             <div style="margin-bottom: 1.5rem;">
                 <label style="display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="checkbox" id="dashboardEditMachineIsActive"> 激活状态
+                    <input id="dashboardEditMachineIsActive" type="checkbox"> 激活状态
                 </label>
             </div>
 
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem;">
-                <button type="button" onclick="hideEditMachineModal()" class="btn btn-secondary" style="margin-right: 1rem;">取消</button>
-                <button type="submit" class="btn btn-success">保存更改</button>
+                <button class="btn btn-secondary" onclick="hideEditMachineModal()" style="margin-right: 1rem;"
+                        type="button">取消
+                </button>
+                <button class="btn btn-success" type="submit">保存更改</button>
             </div>
         </form>
     </div>
 </div>
-<div id="vmosMachinesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1003;">
+<div id="vmosMachinesModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1003;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
             <h3 style="margin: 0;">🖥️ VMOS机器列表</h3>
-            <button onclick="hideVmosMachinesModal()" class="btn btn-secondary btn-sm">✕ 关闭</button>
+            <button class="btn btn-secondary btn-sm" onclick="hideVmosMachinesModal()">✕ 关闭</button>
         </div>
         <div id="vmosMachinesContent">
             <!-- 内容将通过JavaScript动态加载 -->

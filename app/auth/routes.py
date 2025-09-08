@@ -1,8 +1,11 @@
 import datetime
+
 from flask import render_template, request, session, redirect, url_for, flash
-from app.auth import bp
+
 from app import db
+from app.auth import bp
 from app.models.user import User
+
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -23,6 +26,7 @@ def login():
             flash('用户名或密码错误')
 
     return render_template('login.html')
+
 
 @bp.route('/logout')
 def logout():

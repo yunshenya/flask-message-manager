@@ -66,6 +66,7 @@ def api_create_user():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/users', methods=['GET'])
 @admin_required
 def api_get_users():
@@ -111,6 +112,7 @@ def api_get_users():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/profile', methods=['GET'])
 @login_required
 def api_get_profile():
@@ -126,6 +128,7 @@ def api_get_profile():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/profile', methods=['PUT'])
 @login_required

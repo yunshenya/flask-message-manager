@@ -68,7 +68,7 @@ function initWebSocket() {
             maxHttpBufferSize: 1e6,
             pingTimeout: 60000,
             pingInterval: 25000
-    });
+        });
 
         setupWebSocketEvents();
         isWebSocketInitialized = true;
@@ -80,7 +80,7 @@ function initWebSocket() {
 
 // 设置 WebSocket 事件监听
 function setupWebSocketEvents() {
-    socket.on('connect', function() {
+    socket.on('connect', function () {
         console.log('WebSocket 连接成功');
         isWebSocketConnected = true;
 
@@ -92,7 +92,7 @@ function setupWebSocketEvents() {
         startDurationUpdates();
     });
 
-    socket.on('disconnect', function(reason) {
+    socket.on('disconnect', function (reason) {
         console.log('WebSocket 连接断开:', reason);
         isWebSocketConnected = false;
         isWebSocketInitialized = false;
@@ -104,7 +104,7 @@ function setupWebSocketEvents() {
         stopDurationUpdates();
     });
 
-    socket.on('connect_error', function(error) {
+    socket.on('connect_error', function (error) {
         console.error('WebSocket 连接错误:', error);
         if (shouldShowNotification('error')) {
             showError('连接错误', 'WebSocket 连接失败，请检查网络');
@@ -112,31 +112,34 @@ function setupWebSocketEvents() {
     });
 
     // 监听 URL 执行更新
-    socket.on('url_executed', function(data) {
+    socket.on('url_executed', function (data) {
         if (data.config_id === currentConfigId) {
             updateSingleUrlItem(data.url_data);
-            updateStatsFromSocket().then(r => {});
+            updateStatsFromSocket().then(r => {
+            });
             updateRunningUrlsCache(data.url_data);
         }
     });
 
     // 监听状态更新
-    socket.on('status_updated', function(data) {
+    socket.on('status_updated', function (data) {
         if (data.config_id === currentConfigId) {
             updateUrlStatus(data.url_id, data.status);
         }
     });
 
     // 监听标签更新
-    socket.on('label_updated', function(data) {
+    socket.on('label_updated', function (data) {
         if (data.config_id === currentConfigId) {
-            loadDashboardData().then(r => {});
-            loadLabelStats().then(r => {});
+            loadDashboardData().then(r => {
+            });
+            loadLabelStats().then(r => {
+            });
         }
     });
 
     // 监听URL启动事件
-    socket.on('url_started', function(data) {
+    socket.on('url_started', function (data) {
         if (data.config_id === currentConfigId) {
             updateRunningUrlsCache(data.url_data);
             updateSingleUrlItem(data.url_data);
@@ -144,7 +147,7 @@ function setupWebSocketEvents() {
     });
 
     // 监听URL停止事件
-    socket.on('url_stopped', function(data) {
+    socket.on('url_stopped', function (data) {
         if (data.config_id === currentConfigId) {
             removeFromRunningUrlsCache(data.url_id);
             updateSingleUrlItem(data.url_data);
@@ -283,7 +286,8 @@ function initializeRunningUrlsCache(urls) {
 function updateSingleUrlItem(urlData) {
     const urlItem = document.querySelector(`[data-url-id="${urlData.id}"]`);
     if (!urlItem) {
-        loadDashboardData().then(r => {});
+        loadDashboardData().then(r => {
+        });
         return;
     }
 
@@ -404,8 +408,8 @@ function updateUrlList(urls) {
 
     if (urls.length === 0) {
         const emptyMessage = currentFilter.isActive
-            ? `没有找到标签为 "${currentFilter.value}" 的URL`
-            : '当前机器暂无URL配置';
+            ? `没有找到标签为 "${currentFilter.value}" 的群聊的配置信息`
+            : '当前机器暂无群聊配置';
         urlList.innerHTML = `<div style="padding: 2rem; text-align: center; color: #666;">${emptyMessage}</div>`;
         return;
     }
@@ -517,7 +521,7 @@ async function apiCall(url, options = {}) {
         return await response.json();
     } catch (error) {
         console.error('API调用错误:', error);
-        showError("失败",'操作失败: ' + error.message);
+        showError("失败", '操作失败: ' + error.message);
         throw error;
     }
 }
@@ -594,7 +598,8 @@ function switchMachine() {
         // 切换机器时清除筛选状态
         clearFilterInternal();
         updateCurrentMachineInfo();
-        loadDashboardData().then(r => {});
+        loadDashboardData().then(r => {
+        });
     }
 }
 
@@ -695,7 +700,6 @@ function updatePageTitle() {
 }
 
 
-
 async function loadLabelStats() {
     if (!currentConfigId) return;
 
@@ -771,7 +775,7 @@ async function filterByLabel(label) {
 
     } catch (error) {
         console.error('按标签筛选失败:', error);
-        showError("失败",'筛选失败');
+        showError("失败", '筛选失败');
     }
 }
 
@@ -789,7 +793,8 @@ function clearFilterInternal() {
 
 function clearFilter() {
     clearFilterInternal();
-    loadDashboardData().then(r => {});
+    loadDashboardData().then(r => {
+    });
 }
 
 // ================================
@@ -814,10 +819,10 @@ async function stopUrl(urlId, urlName) {
             method: 'POST'
         });
 
-        console.log(`URL "${urlName}" 停止成功:`, result);
+        console.log(`群聊 "${urlName}" 停止成功:`, result);
         await loadDashboardData();
     } catch (error) {
-        console.error(`停止URL "${urlName}" 失败:`, error);
+        console.error(`停止群聊 "${urlName}" 失败:`, error);
     }
 }
 
@@ -840,7 +845,7 @@ async function editUrl(urlId) {
 
         showEditUrlModal();
     } catch (error) {
-        console.error('获取URL信息失败:', error);
+        console.error('获取群聊信息失败:', error);
         showError("失败", '获取群聊信息失败');
     }
 }
@@ -934,7 +939,7 @@ async function addUrl(event) {
 // URL删除功能
 // ================================
 async function deleteUrl(urlId, urlName) {
-    if (!await showConfirm('确认删除', `确定要删除URL "${urlName}" 吗？此操作不可撤销。`, 'danger')) {
+    if (!await showConfirm('确认删除', `确定要删除群聊 "${urlName}" 吗？此操作不可撤销。`, 'danger')) {
         return;
     }
 
@@ -943,7 +948,7 @@ async function deleteUrl(urlId, urlName) {
             method: 'DELETE'
         });
 
-        showSuccess("成功", 'URL删除成功!');
+        showSuccess("成功", '群聊删除成功!');
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -963,7 +968,7 @@ async function resetUrlCount(urlId, urlName) {
             method: 'POST'
         });
 
-        showSuccess("成功" + 'URL计数重置成功!');
+        showSuccess("成功" + '群聊发送计数重置成功!');
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -976,11 +981,11 @@ async function resetAllUrls() {
         return;
     }
 
-    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有群聊的运行状态。', 'danger')) return;
+    if (!await showConfirm('确认重置', '确定要重置当前机器所有群聊的执行计数吗？这将同时停止所有群聊的运行状态。', 'danger')) return;
 
     try {
-        const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
-        showInfo("提示",result.message);
+        const result = await apiCall(`/api/config/${currentConfigId}/reset`, {method: 'POST'});
+        showInfo("提示", result.message);
         await loadDashboardData();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -999,27 +1004,27 @@ async function startCurrentMachine() {
     try {
         const result = await apiCall(`/api/start`, {
             method: 'POST',
-            body: JSON.stringify({ pade_code: currentConfigData.pade_code })
+            body: JSON.stringify({pade_code: currentConfigData.pade_code})
         });
         console.log('启动成功:', result);
         await loadDashboardData();
         showSuccess('成功', '当前机器启动成功');
     } catch (error) {
         console.error('启动失败:', error);
-        showError("启动失败",'当前机器启动失败');
+        showError("启动失败", '当前机器启动失败');
     }
 }
 
 async function stopCurrentMachine() {
     if (!currentConfigData || !currentConfigData.pade_code) {
-        showError("配置错误",'当前机器没有配置代码');
+        showError("配置错误", '当前机器没有配置代码');
         return;
     }
 
     try {
         const result = await apiCall(`/api/stop`, {
             method: 'POST',
-            body: JSON.stringify({ pade_code: currentConfigData.pade_code })
+            body: JSON.stringify({pade_code: currentConfigData.pade_code})
         });
 
         console.log('停止成功:', result);
@@ -1050,7 +1055,7 @@ async function startAllMachines() {
         try {
             await apiCall(`/api/start`, {
                 method: 'POST',
-                body: JSON.stringify({ pade_code: machine.pade_code })
+                body: JSON.stringify({pade_code: machine.pade_code})
             });
             successCount++;
         } catch (error) {
@@ -1059,13 +1064,13 @@ async function startAllMachines() {
         }
     }
 
-    showSuccess("成功",`批量启动完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
+    showSuccess("成功", `批量启动完成: 成功 ${successCount} 台，失败 ${failCount} 台`);
     await loadDashboardData();
 }
 
 async function stopAllMachines() {
     if (!availableMachines.length) {
-        showError("错误",'没有可用的机器');
+        showError("错误", '没有可用的机器');
         return;
     }
 
@@ -1080,7 +1085,7 @@ async function stopAllMachines() {
         try {
             await apiCall(`/api/stop`, {
                 method: 'POST',
-                body: JSON.stringify({ pade_code: machine.pade_code })
+                body: JSON.stringify({pade_code: machine.pade_code})
             });
             successCount++;
         } catch (error) {
@@ -1180,7 +1185,7 @@ async function saveEditedMachine(event) {
 
 async function editCurrentMachine() {
     if (!currentConfigId) {
-        showError("操作失败",'请先选择一台机器');
+        showError("操作失败", '请先选择一台机器');
         return;
     }
     await editMachine(currentConfigId);
@@ -1235,7 +1240,8 @@ async function loadMachineManagementList() {
                                 <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.pade_code).replace(/'/g, '&#39;')}')">删除</button>
                             </td>
                         </tr>
-                    `}).join('')}
+                    `
+        }).join('')}
                 </tbody>
             </table>
         `;
@@ -1250,7 +1256,7 @@ async function toggleMachine(machineId) {
             method: 'POST'
         });
 
-        showInfo("提示",result.message);
+        showInfo("提示", result.message);
         // 刷新机器管理列表
         await loadMachineManagementList();
         // 刷新下拉列表
@@ -1262,7 +1268,7 @@ async function toggleMachine(machineId) {
 }
 
 async function deleteMachine(machineId, machineName) {
-    if (!await showConfirm('确认删除', `确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`, 'danger')) {
+    if (!await showConfirm('确认删除', `确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有群聊配置！此操作不可撤销。`, 'danger')) {
         return;
     }
 
@@ -1298,7 +1304,7 @@ function stopMonitoring() {
 
 function refreshData() {
     if (!currentConfigId) {
-        showInfo("提示",'请先选择一台机器');
+        showInfo("提示", '请先选择一台机器');
         return;
     }
 
@@ -1367,7 +1373,7 @@ async function syncNewMachines() {
                 await loadDashboardData();
             }
         } else {
-            showInfo("提示",`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+            showInfo("提示", `没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
         }
 
     } catch (error) {
@@ -1402,7 +1408,7 @@ async function syncNewMachinesFromModal() {
         });
 
         if (result.new_machines_count > 0) {
-            showSuccess("成功",`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+            showSuccess("成功", `同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
                 `现有机器: ${result.existing_machines_count} 台\n` +
                 `总计机器: ${result.total_machines} 台`);
 
@@ -1422,12 +1428,12 @@ async function syncNewMachinesFromModal() {
                 await loadDashboardData();
             }
         } else {
-            showInfo("提示",`没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
+            showInfo("提示", `没有发现新机器\n当前系统中已有 ${result.existing_machines_count} 台机器`);
         }
 
     } catch (error) {
         console.error('同步新机器失败:', error);
-        showError("失败",'同步新机器失败，请检查网络连接或稍后重试');
+        showError("失败", '同步新机器失败，请检查网络连接或稍后重试');
     } finally {
         // 恢复按钮状态
         const syncBtn = document.querySelector('button[onclick="syncNewMachinesFromModal()"]');

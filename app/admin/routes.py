@@ -1,8 +1,10 @@
 from flask import render_template, request, redirect, url_for, flash, session
-from app.admin import bp
+
 from app import db
-from app.models.user import User
+from app.admin import bp
 from app.auth.decorators import admin_required
+from app.models.user import User
+
 
 @bp.route('/')
 @admin_required
@@ -10,6 +12,7 @@ def admin_panel():
     """管理员面板"""
     users = User.query.all()
     return render_template('admin.html', users=users, session=session)
+
 
 @bp.route('/create-user', methods=['POST'])
 @admin_required
@@ -43,6 +46,7 @@ def create_user():
 
     return redirect(url_for('admin.admin_panel'))
 
+
 @bp.route('/toggle-user/<int:user_id>')
 @admin_required
 def toggle_user_status(user_id):
@@ -60,6 +64,7 @@ def toggle_user_status(user_id):
         flash(f'操作失败: {str(e)}')
 
     return redirect(url_for('admin.admin_panel'))
+
 
 @bp.route('/delete-user/<int:user_id>')
 @admin_required

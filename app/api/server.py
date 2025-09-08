@@ -454,6 +454,7 @@ def delete_label_token():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route("/config/<int:config_id>/running-durations", methods=["GET"])
 @login_required
 def get_running_durations(config_id):

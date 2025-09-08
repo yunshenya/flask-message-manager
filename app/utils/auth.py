@@ -60,7 +60,7 @@ class VmosUtil(object):
         )
 
         # 假设这些变量已经被赋值
-        service:Any = "armcloud-paas"  # 服务名
+        service: Any = "armcloud-paas"  # 服务名
 
         # 第一次hmacSHA256
         first_hmac = hmac.new(self._sk.encode(), digestmod=hashlib.sha256)
@@ -83,7 +83,6 @@ class VmosUtil(object):
 
         return signature
 
-
     def send(self):
         signature = self._get_signature()
         url = f"https://api.vmoscloud.com{self._url}"
@@ -96,5 +95,3 @@ class VmosUtil(object):
         }
         response = requests.request("POST", url, headers=headers, data=payload)
         return response.json()
-
-

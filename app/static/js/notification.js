@@ -184,7 +184,7 @@ window.showConfirm = (title, message, type = 'primary') => {
 };
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         window.notificationSystem = new NotificationSystem();
     });
 } else {

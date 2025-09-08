@@ -3,6 +3,7 @@ from typing import Any
 from app import create_app, db, Config, socketio
 from app.models import User, ConfigData, UrlData
 from app.utils.vmos import get_phone_list
+from loguru import logger
 
 app = create_app()
 
@@ -10,8 +11,6 @@ def init_database():
     try:
         with app.app_context():
             db.create_all()
-
-            # 创建默认管理员用户
             admin_user = User.query.filter_by(username='admin').first()
             if not admin_user:
                 admin_user = User(
@@ -61,29 +60,28 @@ def init_database():
                         )
                         db.session.add(url)
 
-                print(f"为 {len(config_ids)} 台机器创建了URL配置")
+                logger.info(f"为 {len(config_ids)} 台机器创建了URL配置")
 
             db.session.commit()
-            print("数据库初始化完成!")
+            logger.info("数据库初始化完成!")
 
             # 显示统计信息
             machine_count = ConfigData.query.count()
             url_count = UrlData.query.count()
             user_count = User.query.count()
 
-            print(f"系统统计: {machine_count} 台机器, {url_count} 个URL, {user_count} 个用户")
+            logger.info(f"系统统计: {machine_count} 台机器, {url_count} 个URL, {user_count} 个用户")
             return True
 
     except Exception as e:
-        print(f"初始化数据库时出错: {e}")
+        logger.error(f"初始化数据库时出错: {e}")
         db.session.rollback()
         return False
 
 if __name__ == '__main__':
     if init_database():
-        print("访问地址: http://localhost:5000")
+        logger.info("访问地址: http://localhost:5000")
     if Config.DEBUG:
         socketio.run(app, host="0.0.0.0", port=5000, debug=Config.DEBUG)
     else:
-        # 生产环境也使用 socketio.run
         socketio.run(app, host='0.0.0.0', port=5000)

@@ -4,6 +4,7 @@ from sqlalchemy import TEXT
 
 from app import db
 
+
 class UrlData(db.Model):
     __tablename__ = 'url_data'
 
@@ -17,7 +18,6 @@ class UrlData(db.Model):
     current_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
 
-    # 新增运行状态字段
     is_running = db.Column(db.Boolean, default=False)
     started_at = db.Column(db.DateTime, nullable=True)
     stopped_at = db.Column(db.DateTime, nullable=True)
@@ -39,7 +39,8 @@ class UrlData(db.Model):
             'current_count': self.current_count,
             'is_active': self.is_active,
             'can_execute': self.current_count < self.max_num,
-            'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith('https://t.me/') else self.url,
+            'telegram_channel': self.url.replace('https://t.me/', '@') if self.url.startswith(
+                'https://t.me/') else self.url,
             'is_running': self.is_running,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'stopped_at': self.stopped_at.isoformat() if self.stopped_at else None,

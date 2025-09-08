@@ -20,6 +20,7 @@ def get_machines():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/machines', methods=['POST'])
 @admin_required
 def create_machine():
@@ -62,6 +63,7 @@ def create_machine():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/machines/<int:machine_id>', methods=['GET'])
 @login_required
 def get_machine(machine_id):
@@ -74,6 +76,7 @@ def get_machine(machine_id):
         return jsonify({'machine': machine.to_dict()})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/machines/<int:machine_id>', methods=['PUT'])
 @admin_required
@@ -124,6 +127,7 @@ def update_machine(machine_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/machines/<int:machine_id>/toggle', methods=['POST'])
 @admin_required
 def toggle_machine_status(machine_id):
@@ -145,6 +149,7 @@ def toggle_machine_status(machine_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+
 @bp.route('/machines/<int:machine_id>', methods=['DELETE'])
 @admin_required
 def delete_machine(machine_id):
@@ -163,6 +168,7 @@ def delete_machine(machine_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/machines/<int:machine_id>/stats', methods=['GET'])
 @login_required
@@ -189,6 +195,7 @@ def get_machine_stats(machine_id):
         return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/machines/batch-start', methods=['POST'])
 @login_required
@@ -234,6 +241,7 @@ def batch_start_machines():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/machines/batch-stop', methods=['POST'])
 @login_required

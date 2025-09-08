@@ -1,5 +1,3 @@
-
-
 // 全局变量
 let currentEditingMachineId = null;
 
@@ -66,7 +64,8 @@ function switchTab(tabName) {
 
     // 如果切换到机器管理，加载机器列表
     if (tabName === 'machines') {
-        loadMachines().then(r => {});
+        loadMachines().then(r => {
+        });
     }
 }
 
@@ -158,7 +157,8 @@ function displayMachines(machines) {
                                     <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
                                 </td>
                             </tr>
-                        `}).join('')}
+                        `
+    }).join('')}
                     </tbody>
                 </table>
             </div>
@@ -209,7 +209,7 @@ async function editMachine(machineId) {
 
 // 删除机器
 async function deleteMachine(machineId, machineName) {
-    if (!await showConfirm("删除",`确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`)) {
+    if (!await showConfirm("删除", `确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`)) {
         return;
     }
 
@@ -218,7 +218,7 @@ async function deleteMachine(machineId, machineName) {
             method: 'DELETE'
         });
 
-        showInfo("提示",result.message);
+        showInfo("提示", result.message);
         await loadMachines();
     } catch (error) {
         // 错误已在apiCall中处理
@@ -228,7 +228,7 @@ async function deleteMachine(machineId, machineName) {
 // 刷新机器列表
 async function refreshMachines() {
     await loadMachines();
-    showInfo("提示",'机器列表已刷新');
+    showInfo("提示", '机器列表已刷新');
 }
 
 // 批量启动机器
@@ -241,7 +241,7 @@ async function batchStartMachines() {
             body: JSON.stringify({})
         });
 
-        showInfo("返回值",result.message);
+        showInfo("返回值", result.message);
         console.log('批量启动结果:', result.results);
     } catch (error) {
         // 错误已在apiCall中处理
@@ -258,7 +258,7 @@ async function batchStopMachines() {
             body: JSON.stringify({})
         });
 
-        showInfo("返回值",result.message);
+        showInfo("返回值", result.message);
         console.log('批量停止结果:', result.results);
     } catch (error) {
         // 错误已在apiCall中处理
@@ -283,7 +283,7 @@ async function syncNewMachines() {
         });
 
         if (result.new_machines_count > 0) {
-            showSuccess("成功",`同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
+            showSuccess("成功", `同步成功！添加了 ${result.new_machines_count} 台新机器\n` +
                 `现有机器: ${result.existing_machines_count} 台\n` +
                 `总计机器: ${result.total_machines} 台`);
 
@@ -305,7 +305,7 @@ async function syncNewMachines() {
 
     } catch (error) {
         console.error('同步新机器失败:', error);
-        showError("失败",'同步新机器失败，请检查网络连接或稍后重试');
+        showError("失败", '同步新机器失败，请检查网络连接或稍后重试');
     } finally {
         // 恢复按钮状态
         const syncBtn = document.querySelector('button[onclick="syncNewMachines()"]');
@@ -327,6 +327,7 @@ async function syncNewMachinesFromModal() {
 function hideVmosMachinesModal() {
     document.getElementById('vmosMachinesModal').style.display = 'none';
 }
+
 async function confirmToggleUser(userId, username, isActiveStr, toggleUrl) {
     const isActive = isActiveStr === 'True';
     const action = isActive ? '禁用' : '激活';
