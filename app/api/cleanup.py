@@ -1,5 +1,6 @@
 import datetime
 from flask import jsonify, request
+from sqlalchemy import text
 
 from app import db
 from app.api import bp
@@ -175,7 +176,7 @@ def execute_cleanup_task(task_id):
 
         # 执行清理
         result = db.session.execute(
-            "SELECT execute_cleanup_task(:cleanup_types, :target_configs)",
+            text( "SELECT execute_cleanup_task(:cleanup_types, :target_configs)"),
             {
                 'cleanup_types': task.cleanup_types,
                 'target_configs': task.target_configs
