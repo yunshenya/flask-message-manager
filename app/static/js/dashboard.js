@@ -1637,71 +1637,69 @@ async function loadDashboardAvailableConfigs() {
 }
 
 async function saveDashboardCleanupTask(event) {
-    async function saveDashboardCleanupTask(event) {
-        event.preventDefault();
+    event.preventDefault();
 
-        const taskId = document.getElementById('dashboardCleanupTaskId').value;
-        const isEdit = !!taskId;
+    const taskId = document.getElementById('dashboardCleanupTaskId').value;
+    const isEdit = !!taskId;
 
-        // 获取清理类型
-        const cleanupTypes = [];
-        if (document.getElementById('dashboardCleanupStatus').checked) cleanupTypes.push('status');
-        if (document.getElementById('dashboardCleanupLabel').checked) cleanupTypes.push('label');
-        if (document.getElementById('dashboardCleanupCounts').checked) cleanupTypes.push('counts');
+    // 获取清理类型
+    const cleanupTypes = [];
+    if (document.getElementById('dashboardCleanupStatus').checked) cleanupTypes.push('status');
+    if (document.getElementById('dashboardCleanupLabel').checked) cleanupTypes.push('label');
+    if (document.getElementById('dashboardCleanupCounts').checked) cleanupTypes.push('counts');
 
-        if (cleanupTypes.length === 0) {
-            showError('输入错误', '请至少选择一种清理内容');
-            return;
+    if (cleanupTypes.length === 0) {
+        showError('输入错误', '请至少选择一种清理内容');
+        return;
+    }
+
+    // 获取目标配置
+    const select = document.getElementById('dashboardCleanupTargetConfigs');
+    const selectedOptions = Array.from(select.selectedOptions);
+    const targetConfigs = selectedOptions
+        .map(option => option.value)
+        .filter(value => value !== '')
+        .map(value => parseInt(value));
+
+    // 根据时间和清理类型自动生成任务名称
+    const timeStr = document.getElementById('dashboardCleanupTaskTime').value;
+    const typeNames = {
+        'status': '状态',
+        'label': '标签',
+        'counts': '次数'
+    };
+    const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
+    const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
+    const autoName = `${timeStr} 清理${typesText} (${targetText})`;
+
+    const data = {
+        name: autoName,
+        description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
+        schedule_time: document.getElementById('dashboardCleanupTaskTime').value,
+        cleanup_types: cleanupTypes,
+        target_configs: targetConfigs.length > 0 ? targetConfigs : null,
+        is_enabled: document.getElementById('dashboardCleanupTaskEnabled').checked
+    };
+
+    try {
+        if (isEdit) {
+            await apiCall(`/api/cleanup-tasks/${taskId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showSuccess('更新成功', '清理任务已更新');
+        } else {
+            await apiCall('/api/cleanup-tasks', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showSuccess('创建成功', '清理任务已创建');
         }
 
-        // 获取目标配置
-        const select = document.getElementById('dashboardCleanupTargetConfigs');
-        const selectedOptions = Array.from(select.selectedOptions);
-        const targetConfigs = selectedOptions
-            .map(option => option.value)
-            .filter(value => value !== '')
-            .map(value => parseInt(value));
-
-        // 根据时间和清理类型自动生成任务名称
-        const timeStr = document.getElementById('dashboardCleanupTaskTime').value;
-        const typeNames = {
-            'status': '状态',
-            'label': '标签',
-            'counts': '次数'
-        };
-        const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
-        const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
-        const autoName = `${timeStr} 清理${typesText} (${targetText})`;
-
-        const data = {
-            name: autoName,
-            description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
-            schedule_time: document.getElementById('dashboardCleanupTaskTime').value,
-            cleanup_types: cleanupTypes,
-            target_configs: targetConfigs.length > 0 ? targetConfigs : null,
-            is_enabled: document.getElementById('dashboardCleanupTaskEnabled').checked
-        };
-
-        try {
-            if (isEdit) {
-                await apiCall(`/api/cleanup-tasks/${taskId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(data)
-                });
-                showSuccess('更新成功', '清理任务已更新');
-            } else {
-                await apiCall('/api/cleanup-tasks', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-                showSuccess('创建成功', '清理任务已创建');
-            }
-
-            hideDashboardAddCleanupTaskModal();
-            await loadDashboardCleanupTasks();
-        } catch (error) {
-            // 错误已在apiCall中处理
-        }
+        hideDashboardAddCleanupTaskModal();
+        await loadDashboardCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
     }
 }
 
