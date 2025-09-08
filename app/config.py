@@ -16,3 +16,5 @@ class Config:
     API_SECRET_TOKEN=os.getenv("API_SECRET_TOKEN")
     DEBUG_str = os.getenv('DEBUG')
     DEBUG = DEBUG_str.lower() == 'true' if DEBUG_str else False
+    ACCESS_KEY = os.getenv('ACCESS_KEY')
+    SECRET_ACCESS = os.getenv('SECRET_ACCESS')

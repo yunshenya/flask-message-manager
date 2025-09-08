@@ -3,7 +3,11 @@ import datetime
 import hashlib
 import hmac
 import json
+from typing import Any
+
 import requests
+
+from app import Config
 
 
 class VmosUtil(object):
@@ -12,22 +16,22 @@ class VmosUtil(object):
             data = {}
         self._url = url
         self._data = data
-        self._ak = "nx9xwcQ5KEap2nUqrJZTBoxJK7G61uvj"
-        self._sk = "7xf9Q8D9VRBhzjWhgzwHx2AB"
+        self._ak = Config.ACCESS_KEY
+        self._sk = Config.SECRET_ACCESS
         self._x_date = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self._content_type = "application/json;charset=UTF-8"
         self._signed_headers = "content-type;host;x-content-sha256;x-date"
         self._host = "api.vmoscloud.com"
 
     def _get_signature(self):
-        json_string = json.dumps(self._data, separators=(',', ':'), ensure_ascii=False)
+        json_string: Any = json.dumps(self._data, separators=(',', ':'), ensure_ascii=False)
 
         # 计算SHA-256哈希值
         hash_object = hashlib.sha256(json_string.encode())
         x_content_sha256 = hash_object.hexdigest()
 
         # 使用f-string构建canonicalStringBuilder
-        canonical_string_builder = (
+        canonical_string_builder: Any = (
             f"host:{self._host}\n"
             f"x-date:{self._x_date}\n"
             f"content-type:{self._content_type}\n"
@@ -36,7 +40,7 @@ class VmosUtil(object):
         )
         # 假设这些变量已经被赋值
         # short_x_date = datetime.datetime.now().strftime("%Y%m%d")  # 短请求时间，例如："20240101"
-        short_x_date = self._x_date[:8]  # 短请求时间，例如："20240101"
+        short_x_date: Any = self._x_date[:8]  # 短请求时间，例如："20240101"
         service = "armcloud-paas"  # 服务名
 
         # 构建credentialScope
@@ -56,7 +60,7 @@ class VmosUtil(object):
         )
 
         # 假设这些变量已经被赋值
-        service = "armcloud-paas"  # 服务名
+        service:Any = "armcloud-paas"  # 服务名
 
         # 第一次hmacSHA256
         first_hmac = hmac.new(self._sk.encode(), digestmod=hashlib.sha256)
@@ -72,7 +76,7 @@ class VmosUtil(object):
         signing_key = hmac.new(second_hmac_result, b'request', digestmod=hashlib.sha256).digest()
 
         # 使用signing_key和string_to_sign计算HMAC-SHA256
-        signature_bytes = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).digest()
+        signature_bytes: Any = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).digest()
 
         # 将HMAC-SHA256的结果转换为十六进制编码的字符串
         signature = binascii.hexlify(signature_bytes).decode()
