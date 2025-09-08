@@ -49,3 +49,72 @@
     transition: all 0.2s;
     flex-shrink: 0;
 }
+
+/* 时间输入框优化样式 - 紧凑版本 */
+.time-input-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 140px; /* 固定较小宽度 */
+}
+
+.time-input-wrapper input[type="time"] {
+    width: 100%;
+    padding: 0.4rem 0.5rem; /* 减小内边距 */
+    border: 1px solid #ddd; /* 减小边框 */
+    border-radius: 4px; /* 减小圆角 */
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 0.9rem; /* 减小字体 */
+    text-align: center;
+    background: white;
+    transition: all 0.3s ease;
+    letter-spacing: 0.5px; /* 减小字符间距 */
+    height: 36px; /* 固定高度 */
+}
+
+.time-input-wrapper input[type="time"]:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.15rem rgba(0, 123, 255, 0.2); /* 减小阴影 */
+    outline: none;
+}
+
+.time-input-wrapper input[type="time"]:hover {
+    border-color: #80bdff;
+}
+
+.time-input-icon {
+    display: none; /* 隐藏图标，让输入框更简洁 */
+}
+
+.time-input-hint {
+    font-size: 0.75rem; /* 减小提示文字 */
+    color: #6c757d;
+    margin-top: 0.25rem;
+    display: block;
+    font-style: italic;
+}
+
+/* 修复 Chrome 时间选择器的样式 */
+.time-input-wrapper input[type="time"]::-webkit-calendar-picker-indicator {
+    background: transparent;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+}
+
+/* Firefox 时间输入优化 */
+.time-input-wrapper input[type="time"]::-moz-focus-inner {
+    border: 0;
+}
+
+/* 移动设备优化 */
+@media (max-width: 768px) {
+    .time-input-wrapper {
+        width: 120px; /* 移动端更小 */
+    }
+
+    .time-input-wrapper input[type="time"] {
+        font-size: 0.85rem;
+        padding: 0.35rem 0.4rem;
+        height: 32px;
+    }
+}

@@ -1095,3 +1095,70 @@ body {
 .url-label-badge {
     padding: 0.1rem 0.5rem 0.1rem 0.3rem !important;
 }
+
+/* 清理管理相关样式 */
+.cleanup-task-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cleanup-task-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.cleanup-checkbox-item {
+    transition: all 0.2s ease;
+}
+
+.cleanup-checkbox-item:hover {
+    background: #e3f2fd !important;
+    transform: translateY(-1px);
+}
+
+.cleanup-time-input {
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+.cleanup-time-input:focus {
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
+}
+
+/* 任务状态卡片样式 */
+.task-info-card {
+    border-left-width: 4px !important;
+    border-left-style: solid !important;
+}
+
+.task-info-card.time-card {
+    border-left-color: #2196f3 !important;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%) !important;
+}
+
+.task-info-card.content-card {
+    border-left-color: #9c27b0 !important;
+    background: linear-gradient(135deg, #f3e5f5 0%, #f8f9fa 100%) !important;
+}
+
+.task-info-card.target-card {
+    border-left-color: #4caf50 !important;
+    background: linear-gradient(135deg, #e8f5e8 0%, #f8f9fa 100%) !important;
+}
+
+/* 响应式优化 */
+@media (max-width: 768px) {
+    .cleanup-task-item > div:first-child {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 1rem !important;
+    }
+
+    .cleanup-task-item > div:first-child > div:last-child {
+        align-self: stretch !important;
+    }
+
+    .cleanup-task-item > div:first-child > div:last-child > div {
+        justify-content: space-around !important;
+    }
+}

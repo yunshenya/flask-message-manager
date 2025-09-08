@@ -94,6 +94,7 @@
             <h3>系统管理</h3>
             <a class="btn btn-warning" href="/admin">用户管理</a>
             <a class="btn btn-info" href="#" onclick="showMachineManagement()">机器管理</a>
+            <a class="btn btn-success" href="#" onclick="showCleanupManagement()">清理管理</a>
         </div>
         {% endif %}
     </div>
@@ -115,6 +116,24 @@
 
     <div class="url-list" id="urlList">
         <!-- URL列表将通过JavaScript动态加载 -->
+    </div>
+</div>
+
+<!-- 清理管理模态框 -->
+<div id="cleanupManagementModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0;">🧹 清理任务管理</h3>
+            <div>
+                <button class="btn btn-success btn-sm" onclick="showDashboardAddCleanupTaskModal()">➕ 新增任务</button>
+                <button class="btn btn-info btn-sm" onclick="loadDashboardCleanupTasks()">🔄 刷新</button>
+                <button class="btn btn-secondary btn-sm" onclick="hideCleanupManagement()">✕ 关闭</button>
+            </div>
+        </div>
+        <div id="dashboardCleanupTasksList">
+            <!-- 清理任务列表将动态加载 -->
+        </div>
     </div>
 </div>
 
@@ -205,6 +224,64 @@
             <div style="text-align: right;">
                 <button class="btn btn-danger" onclick="hideEditUrlModal()" type="button">取消</button>
                 <button class="btn btn-success" type="submit">保存</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 仪表板-添加清理任务模态框 -->
+<div id="dashboardAddCleanupTaskModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+        <h3>🧹 清理任务设置</h3>
+        <form onsubmit="saveDashboardCleanupTask(event)">
+            <input type="hidden" id="dashboardCleanupTaskId">
+
+            <div style="margin-bottom: 1.5rem;">
+                <label>⏰ 执行时间:</label>
+                <div class="time-input-wrapper" style="margin-top: 0.5rem;">
+                    <input id="dashboardCleanupTaskTime" required type="time" value="03:00">
+                </div>
+                <span class="time-input-hint">24小时制</span>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label style="margin-bottom: 0.5rem; display: block; font-weight: bold;">🧹 清理内容:</label>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;">
+                        <input type="checkbox" id="dashboardCleanupStatus" value="status" style="transform: scale(1.2);">
+                        <span>📊 清理状态信息</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;">
+                        <input type="checkbox" id="dashboardCleanupLabel" value="label" style="transform: scale(1.2);">
+                        <span>🏷️ 清理标签信息</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: white; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;">
+                        <input type="checkbox" id="dashboardCleanupCounts" value="counts" style="transform: scale(1.2);">
+                        <span>🔄 重置运行次数</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label>🖥️ 目标机器:</label>
+                <select id="dashboardCleanupTargetConfigs" multiple style="width: 100%; height: 120px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem;">
+                    <option value="">全部机器</option>
+                </select>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.5rem; border-radius: 4px; font-size: 0.85rem; margin-top: 0.5rem;">
+                    💡 按住Ctrl可多选机器，不选表示清理全部机器
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input id="dashboardCleanupTaskEnabled" type="checkbox" checked style="transform: scale(1.2);">
+                    <span>✅ 启用任务</span>
+                </label>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem;">
+                <button class="btn btn-secondary" onclick="hideDashboardAddCleanupTaskModal()" style="margin-right: 1rem;" type="button">取消</button>
+                <button class="btn btn-success" type="submit">💾 保存任务</button>
             </div>
         </form>
     </div>

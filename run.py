@@ -2,6 +2,7 @@ from typing import Any
 
 from app import create_app, db, Config, socketio
 from app.models import User, ConfigData, UrlData
+from app.services.cleanup_scheduler import cleanup_scheduler
 from app.utils.vmos import get_phone_list
 from loguru import logger
 
@@ -81,7 +82,16 @@ def init_database():
 if __name__ == '__main__':
     if init_database():
         logger.info("访问地址: http://localhost:5000")
-    if Config.DEBUG:
-        socketio.run(app, host="0.0.0.0", port=5000, debug=Config.DEBUG)
-    else:
-        socketio.run(app, host='0.0.0.0', port=5000)
+
+        # 启动清理调度器
+        cleanup_scheduler.start()
+        logger.info("清理调度器已启动")
+
+    try:
+        if Config.DEBUG:
+            socketio.run(app, host="0.0.0.0", port=5000, debug=Config.DEBUG)
+        else:
+            socketio.run(app, host='0.0.0.0', port=5000)
+    finally:
+        # 确保在应用关闭时停止调度器
+        cleanup_scheduler.stop()

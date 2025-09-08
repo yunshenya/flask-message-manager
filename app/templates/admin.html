@@ -22,6 +22,7 @@
     <div class="tabs">
         <div class="tab active" onclick="switchTab('users')">用户管理</div>
         <div class="tab" onclick="switchTab('machines')">机器管理</div>
+        <div class="tab" onclick="switchTab('cleanup')">清理管理</div>
     </div>
 
     <!-- 用户管理标签页 -->
@@ -110,6 +111,74 @@
                 <p>加载中...</p>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- 清理管理标签页 -->
+<div class="tab-content" id="cleanup-tab">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>定时清理任务</h2>
+            <div>
+                <button class="btn btn-success" onclick="showAddCleanupTaskModal()">➕ 新增清理任务</button>
+                <button class="btn btn-info" onclick="loadCleanupTasks()">🔄 刷新列表</button>
+            </div>
+        </div>
+        <div id="cleanupTasksTable">
+            <p>加载中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- 添加清理任务模态框 -->
+<div id="addCleanupTaskModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1004;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+        <h3>新增清理任务</h3>
+        <form onsubmit="saveCleanupTask(event)">
+            <input type="hidden" id="cleanupTaskId">
+
+            <div class="form-group">
+                <label>⏰ 执行时间:</label>
+                <div class="time-input-wrapper" style="margin-top: 0.5rem;">
+                    <input id="cleanupTaskTime" required type="time" value="03:00">
+                </div>
+                <span class="time-input-hint">24小时制</span>
+            </div>
+
+            <div class="form-group">
+                <label>清理内容:</label>
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="cleanupStatus" value="status"> 清理状态信息
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="cleanupLabel" value="label"> 清理标签信息
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="cleanupCounts" value="counts"> 重置运行次数
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>目标机器:</label>
+                <select id="cleanupTargetConfigs" multiple style="height: 120px; margin-top: 0.5rem;">
+                    <option value="">全部机器</option>
+                </select>
+                <small style="color: #666;">按住Ctrl可多选，不选表示全部机器</small>
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input id="cleanupTaskEnabled" type="checkbox" checked> 启用任务
+                </label>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+                <button class="btn btn-secondary" onclick="hideAddCleanupTaskModal()" style="margin-right: 1rem;" type="button">取消</button>
+                <button class="btn btn-success" type="submit">保存任务</button>
+            </div>
+        </form>
     </div>
 </div>
 

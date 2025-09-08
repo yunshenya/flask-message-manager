@@ -1493,3 +1493,287 @@ async function removeUrlLabel(urlId, urlName, currentLabel) {
         showError('删除群聊标签失败:', error)
     }
 }
+
+// ================================
+// 仪表板清理管理功能
+// ================================
+
+let dashboardAvailableConfigs = [];
+
+function showCleanupManagement() {
+    document.getElementById('cleanupManagementModal').style.display = 'block';
+    loadDashboardCleanupTasks().then(() => {
+        console.log('清理任务列表已加载');
+    });
+}
+
+function hideCleanupManagement() {
+    document.getElementById('cleanupManagementModal').style.display = 'none';
+}
+
+async function loadDashboardCleanupTasks() {
+    try {
+        const tasks = await apiCall('/api/cleanup-tasks');
+        displayDashboardCleanupTasks(tasks);
+    } catch (error) {
+        document.getElementById('dashboardCleanupTasksList').innerHTML = '<p style="color: #dc3545; text-align: center;">加载清理任务失败</p>';
+    }
+}
+
+function displayDashboardCleanupTasks(tasks) {
+    const listDiv = document.getElementById('dashboardCleanupTasksList');
+
+    if (tasks.length === 0) {
+        listDiv.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: #666;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🧹</div>
+                <h4>暂无清理任务</h4>
+                <p>点击"新增任务"创建您的第一个清理任务</p>
+                <button class="btn btn-success" onclick="showDashboardAddCleanupTaskModal()">➕ 创建清理任务</button>
+            </div>
+        `;
+        return;
+    }
+
+    const cleanupTypeNames = {
+        'status': '📊 状态',
+        'label': '🏷️ 标签',
+        'counts': '🔄 次数'
+    };
+
+    listDiv.innerHTML = tasks.map(task => {
+        const cleanupTypesText = task.cleanup_types.map(t => cleanupTypeNames[t] || t).join(' ');
+        const targetText = task.target_configs ? `${task.target_configs.length}台机器` : '全部机器';
+        const isEnabled = task.is_enabled;
+
+        return `
+            <div class="cleanup-task-item" style="background: white; border: 1px solid #dee2e6; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <div>
+                        <h4 style="margin: 0 0 0.5rem 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                            🧹 ${task.name}
+                            <span class="machine-status ${isEnabled ? 'status-active' : 'status-inactive'}" style="font-size: 0.75rem;">
+                                ${isEnabled ? '✅ 启用' : '❌ 禁用'}
+                            </span>
+                        </h4>
+                        <p style="margin: 0; color: #666; font-size: 0.9rem;">${task.description || '无描述'}</p>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-info btn-sm" onclick="editDashboardCleanupTask(${task.id})" title="编辑任务">✏️</button>
+                        <button class="btn btn-warning btn-sm" onclick="toggleDashboardCleanupTask(${task.id})" title="${isEnabled ? '禁用' : '启用'}任务">
+                            ${isEnabled ? '⏸️' : '▶️'}
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="executeDashboardCleanupTask(${task.id})" title="立即执行">🚀</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDashboardCleanupTask(${task.id}, '${task.name.replace(/'/g, '&#39;')}')" title="删除任务">🗑️</button>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    <div style="background: #e3f2fd; padding: 0.75rem; border-radius: 4px; border-left: 4px solid #2196f3;">
+                        <div style="font-weight: bold; color: #1976d2; margin-bottom: 0.25rem;">⏰ 执行时间</div>
+                        <div style="font-size: 1.1rem; font-weight: bold;">${task.schedule_time}</div>
+                    </div>
+                    <div style="background: #f3e5f5; padding: 0.75rem; border-radius: 4px; border-left: 4px solid #9c27b0;">
+                        <div style="font-weight: bold; color: #7b1fa2; margin-bottom: 0.25rem;">🧹 清理内容</div>
+                        <div>${cleanupTypesText}</div>
+                    </div>
+                    <div style="background: #e8f5e8; padding: 0.75rem; border-radius: 4px; border-left: 4px solid #4caf50;">
+                        <div style="font-weight: bold; color: #388e3c; margin-bottom: 0.25rem;">🖥️ 目标范围</div>
+                        <div>${targetText}</div>
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.85rem;">
+                    <div style="color: #666;">
+                        <strong>📅 下次运行:</strong> 
+                        ${task.next_run ? new Date(task.next_run).toLocaleString() : '未安排'}
+                    </div>
+                    <div style="color: #666;">
+                        <strong>📝 上次运行:</strong> 
+                        ${task.last_run ? new Date(task.last_run).toLocaleString() : '从未执行'}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function showDashboardAddCleanupTaskModal() {
+    // 清空表单
+    document.getElementById('dashboardCleanupTaskId').value = '';
+    document.getElementById('dashboardCleanupTaskTime').value = '03:00';
+    document.getElementById('dashboardCleanupTaskEnabled').checked = true;
+
+    // 清空复选框
+    document.getElementById('dashboardCleanupStatus').checked = false;
+    document.getElementById('dashboardCleanupLabel').checked = false;
+    document.getElementById('dashboardCleanupCounts').checked = false;
+
+    // 加载可用配置
+    await loadDashboardAvailableConfigs();
+
+    document.getElementById('dashboardAddCleanupTaskModal').style.display = 'block';
+}
+
+function hideDashboardAddCleanupTaskModal() {
+    document.getElementById('dashboardAddCleanupTaskModal').style.display = 'none';
+}
+
+async function loadDashboardAvailableConfigs() {
+    try {
+        dashboardAvailableConfigs = await apiCall('/api/cleanup-tasks/configs');
+        const select = document.getElementById('dashboardCleanupTargetConfigs');
+        select.innerHTML = '<option value="">全部机器</option>';
+
+        dashboardAvailableConfigs.forEach(config => {
+            const option = document.createElement('option');
+            option.value = config.id;
+            option.textContent = `${config.name} (${config.pade_code})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('加载配置列表失败:', error);
+    }
+}
+
+async function saveDashboardCleanupTask(event) {
+    async function saveDashboardCleanupTask(event) {
+        event.preventDefault();
+
+        const taskId = document.getElementById('dashboardCleanupTaskId').value;
+        const isEdit = !!taskId;
+
+        // 获取清理类型
+        const cleanupTypes = [];
+        if (document.getElementById('dashboardCleanupStatus').checked) cleanupTypes.push('status');
+        if (document.getElementById('dashboardCleanupLabel').checked) cleanupTypes.push('label');
+        if (document.getElementById('dashboardCleanupCounts').checked) cleanupTypes.push('counts');
+
+        if (cleanupTypes.length === 0) {
+            showError('输入错误', '请至少选择一种清理内容');
+            return;
+        }
+
+        // 获取目标配置
+        const select = document.getElementById('dashboardCleanupTargetConfigs');
+        const selectedOptions = Array.from(select.selectedOptions);
+        const targetConfigs = selectedOptions
+            .map(option => option.value)
+            .filter(value => value !== '')
+            .map(value => parseInt(value));
+
+        // 根据时间和清理类型自动生成任务名称
+        const timeStr = document.getElementById('dashboardCleanupTaskTime').value;
+        const typeNames = {
+            'status': '状态',
+            'label': '标签',
+            'counts': '次数'
+        };
+        const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
+        const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
+        const autoName = `${timeStr} 清理${typesText} (${targetText})`;
+
+        const data = {
+            name: autoName,
+            description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
+            schedule_time: document.getElementById('dashboardCleanupTaskTime').value,
+            cleanup_types: cleanupTypes,
+            target_configs: targetConfigs.length > 0 ? targetConfigs : null,
+            is_enabled: document.getElementById('dashboardCleanupTaskEnabled').checked
+        };
+
+        try {
+            if (isEdit) {
+                await apiCall(`/api/cleanup-tasks/${taskId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                showSuccess('更新成功', '清理任务已更新');
+            } else {
+                await apiCall('/api/cleanup-tasks', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                showSuccess('创建成功', '清理任务已创建');
+            }
+
+            hideDashboardAddCleanupTaskModal();
+            await loadDashboardCleanupTasks();
+        } catch (error) {
+            // 错误已在apiCall中处理
+        }
+    }
+}
+
+async function editDashboardCleanupTask(taskId) {
+    try {
+        const task = await apiCall(`/api/cleanup-tasks/${taskId}`);
+
+        // 填充表单
+        document.getElementById('dashboardCleanupTaskId').value = task.id;
+        document.getElementById('dashboardCleanupTaskTime').value = task.schedule_time;
+        document.getElementById('dashboardCleanupTaskEnabled').checked = task.is_enabled;
+
+        // 设置清理类型
+        document.getElementById('dashboardCleanupStatus').checked = task.cleanup_types.includes('status');
+        document.getElementById('dashboardCleanupLabel').checked = task.cleanup_types.includes('label');
+        document.getElementById('dashboardCleanupCounts').checked = task.cleanup_types.includes('counts');
+
+        // 加载配置并设置选中状态
+        await loadDashboardAvailableConfigs();
+        if (task.target_configs) {
+            const select = document.getElementById('dashboardCleanupTargetConfigs');
+            Array.from(select.options).forEach(option => {
+                option.selected = task.target_configs.includes(parseInt(option.value));
+            });
+        }
+
+        document.getElementById('dashboardAddCleanupTaskModal').style.display = 'block';
+    } catch (error) {
+        showError('加载失败', '获取任务信息失败');
+    }
+}
+
+async function toggleDashboardCleanupTask(taskId) {
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}/toggle`, {
+            method: 'POST'
+        });
+        showInfo('状态更新', result.message);
+        await loadDashboardCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function executeDashboardCleanupTask(taskId) {
+    if (!await showConfirm('确认执行', '确定要立即执行这个清理任务吗？此操作将清理相应的数据。', 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}/execute`, {
+            method: 'POST'
+        });
+        showSuccess('执行成功', result.message);
+        await loadDashboardCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function deleteDashboardCleanupTask(taskId, taskName) {
+    if (!await showConfirm('确认删除', `确定要删除清理任务 "${taskName}" 吗？此操作不可撤销。`, 'danger')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+        showSuccess('删除成功', result.message);
+        await loadDashboardCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}

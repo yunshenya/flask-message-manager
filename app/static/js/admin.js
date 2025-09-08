@@ -66,6 +66,8 @@ function switchTab(tabName) {
     if (tabName === 'machines') {
         loadMachines().then(r => {
         });
+    } else if (tabName === 'cleanup') {
+        loadCleanupTasks().then(r => {});
     }
 }
 
@@ -351,5 +353,270 @@ async function confirmDeleteUser(userId, username, deleteUrl) {
         } catch (error) {
             showError('删除失败', '删除用户时发生错误');
         }
+    }
+}
+
+
+// ================================
+// 清理任务管理功能
+// ================================
+
+let availableConfigs = [];
+
+async function loadCleanupTasks() {
+    try {
+        const tasks = await apiCall('/api/cleanup-tasks');
+        displayCleanupTasks(tasks);
+    } catch (error) {
+        document.getElementById('cleanupTasksTable').innerHTML = '<p>加载失败</p>';
+    }
+}
+
+function displayCleanupTasks(tasks) {
+    const tableDiv = document.getElementById('cleanupTasksTable');
+
+    if (tasks.length === 0) {
+        tableDiv.innerHTML = '<p>暂无清理任务</p>';
+        return;
+    }
+
+    tableDiv.innerHTML = `
+        <div style="overflow-x: auto;">
+            <table style="min-width: 1000px;">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 150px;">任务名称</th>
+                        <th style="width: 100px;">执行时间</th>
+                        <th style="width: 120px;">清理内容</th>
+                        <th style="width: 100px;">目标机器</th>
+                        <th style="width: 80px;">状态</th>
+                        <th style="width: 140px;">下次运行</th>
+                        <th style="width: 140px;">上次运行</th>
+                        <th style="width: 200px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tasks.map(task => {
+        const cleanupTypeNames = {
+            'status': '状态',
+            'label': '标签',
+            'counts': '次数'
+        };
+        const cleanupTypesText = task.cleanup_types.map(t => cleanupTypeNames[t] || t).join(', ');
+        const targetText = task.target_configs ? `${task.target_configs.length}台机器` : '全部机器';
+
+        return `
+                            <tr>
+                                <td>${task.id}</td>
+                                <td title="${task.description || ''}">${task.name}</td>
+                                <td>${task.schedule_time}</td>
+                                <td>${cleanupTypesText}</td>
+                                <td>${targetText}</td>
+                                <td>
+                                    <span class="machine-status ${task.is_enabled ? 'status-active' : 'status-inactive'}">
+                                        ${task.is_enabled ? '启用' : '禁用'}
+                                    </span>
+                                </td>
+                                <td style="font-size: 0.85em;">
+                                    ${task.next_run ? new Date(task.next_run).toLocaleString() : '-'}
+                                </td>
+                                <td style="font-size: 0.85em;">
+                                    ${task.last_run ? new Date(task.last_run).toLocaleString() : '从未执行'}
+                                </td>
+                                <td>
+                                    <button class="btn btn-info btn-sm" onclick="editCleanupTask(${task.id})" style="margin: 2px;">编辑</button>
+                                    <button class="btn btn-warning btn-sm" onclick="toggleCleanupTask(${task.id})" style="margin: 2px;">
+                                        ${task.is_enabled ? '禁用' : '启用'}
+                                    </button>
+                                    <button class="btn btn-success btn-sm" onclick="executeCleanupTask(${task.id})" style="margin: 2px;">立即执行</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteCleanupTask(${task.id}, '${task.name.replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
+                                </td>
+                            </tr>
+                        `;
+    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function showAddCleanupTaskModal() {
+    // 清空表单
+    document.getElementById('cleanupTaskId').value = '';
+    document.getElementById('cleanupTaskTime').value = '03:00';
+    document.getElementById('cleanupTaskEnabled').checked = true;
+
+    // 清空复选框
+    document.getElementById('cleanupStatus').checked = false;
+    document.getElementById('cleanupLabel').checked = false;
+    document.getElementById('cleanupCounts').checked = false;
+
+    // 加载可用配置
+    await loadAvailableConfigs();
+
+    document.getElementById('addCleanupTaskModal').style.display = 'block';
+}
+
+function hideAddCleanupTaskModal() {
+    document.getElementById('addCleanupTaskModal').style.display = 'none';
+}
+
+async function loadAvailableConfigs() {
+    try {
+        availableConfigs = await apiCall('/api/cleanup-tasks/configs');
+        const select = document.getElementById('cleanupTargetConfigs');
+        select.innerHTML = '<option value="">全部机器</option>';
+
+        availableConfigs.forEach(config => {
+            const option = document.createElement('option');
+            option.value = config.id;
+            option.textContent = `${config.name} (${config.pade_code})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('加载配置列表失败:', error);
+    }
+}
+
+async function saveCleanupTask(event) {
+    event.preventDefault();
+
+    const taskId = document.getElementById('cleanupTaskId').value;
+    const isEdit = !!taskId;
+
+    // 获取清理类型
+    const cleanupTypes = [];
+    if (document.getElementById('cleanupStatus').checked) cleanupTypes.push('status');
+    if (document.getElementById('cleanupLabel').checked) cleanupTypes.push('label');
+    if (document.getElementById('cleanupCounts').checked) cleanupTypes.push('counts');
+
+    if (cleanupTypes.length === 0) {
+        showError('输入错误', '请至少选择一种清理内容');
+        return;
+    }
+
+    // 获取目标配置
+    const select = document.getElementById('cleanupTargetConfigs');
+    const selectedOptions = Array.from(select.selectedOptions);
+    const targetConfigs = selectedOptions
+        .map(option => option.value)
+        .filter(value => value !== '')
+        .map(value => parseInt(value));
+
+    // 自动生成任务名称
+    const timeStr = document.getElementById('cleanupTaskTime').value;
+    const typeNames = {
+        'status': '状态',
+        'label': '标签',
+        'counts': '次数'
+    };
+    const typesText = cleanupTypes.map(t => typeNames[t]).join('+');
+    const targetText = targetConfigs.length > 0 ? `${targetConfigs.length}台机器` : '全部机器';
+    const autoName = `${timeStr} 清理${typesText} (${targetText})`;
+
+    const data = {
+        name: autoName,
+        description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
+        schedule_time: document.getElementById('cleanupTaskTime').value,
+        cleanup_types: cleanupTypes,
+        target_configs: targetConfigs.length > 0 ? targetConfigs : null,
+        is_enabled: document.getElementById('cleanupTaskEnabled').checked
+    };
+
+    try {
+        if (isEdit) {
+            await apiCall(`/api/cleanup-tasks/${taskId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showSuccess('更新成功', '清理任务已更新');
+        } else {
+            await apiCall('/api/cleanup-tasks', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showSuccess('创建成功', '清理任务已创建');
+        }
+
+        hideAddCleanupTaskModal();
+        await loadCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function editCleanupTask(taskId) {
+    try {
+        const task = await apiCall(`/api/cleanup-tasks/${taskId}`);
+
+        // 填充表单
+        document.getElementById('cleanupTaskId').value = task.id;
+        document.getElementById('cleanupTaskName').value = task.name;
+        document.getElementById('cleanupTaskTime').value = task.schedule_time;
+        document.getElementById('cleanupTaskDesc').value = task.description || '';
+        document.getElementById('cleanupTaskEnabled').checked = task.is_enabled;
+
+        // 设置清理类型
+        document.getElementById('cleanupStatus').checked = task.cleanup_types.includes('status');
+        document.getElementById('cleanupLabel').checked = task.cleanup_types.includes('label');
+        document.getElementById('cleanupCounts').checked = task.cleanup_types.includes('counts');
+
+        // 加载配置并设置选中状态
+        await loadAvailableConfigs();
+        if (task.target_configs) {
+            const select = document.getElementById('cleanupTargetConfigs');
+            Array.from(select.options).forEach(option => {
+                option.selected = task.target_configs.includes(parseInt(option.value));
+            });
+        }
+
+        document.getElementById('addCleanupTaskModal').style.display = 'block';
+    } catch (error) {
+        showError('加载失败', '获取任务信息失败');
+    }
+}
+
+async function toggleCleanupTask(taskId) {
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}/toggle`, {
+            method: 'POST'
+        });
+        showInfo('状态更新', result.message);
+        await loadCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function executeCleanupTask(taskId) {
+    if (!await showConfirm('确认执行', '确定要立即执行这个清理任务吗？', 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}/execute`, {
+            method: 'POST'
+        });
+        showSuccess('执行成功', result.message);
+        await loadCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function deleteCleanupTask(taskId, taskName) {
+    if (!await showConfirm('确认删除', `确定要删除清理任务 "${taskName}" 吗？此操作不可撤销。`, 'danger')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/cleanup-tasks/${taskId}`, {
+            method: 'DELETE'
+        });
+        showSuccess('删除成功', result.message);
+        await loadCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
     }
 }
