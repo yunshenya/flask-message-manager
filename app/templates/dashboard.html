@@ -76,7 +76,7 @@
 
     <div class="actions">
         <div class="action-card">
-            <h3>URL管理</h3>
+            <h3>群聊管理</h3>
             <a href="#" onclick="showAddUrlModal()" class="btn btn-success">添加新群</a>
             <a href="#" onclick="refreshData()" class="btn btn-primary">刷新数据</a>
             <a href="#" onclick="resetAllUrls()" class="btn btn-warning">重置所有计数</a>
@@ -132,10 +132,10 @@
 <!-- 添加URL模态框 -->
 <div id="addUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
-        <h3>添加新URL</h3>
+        <h3>添加新群聊</h3>
         <form onsubmit="addUrl(event)">
             <div style="margin-bottom: 1rem;">
-                <label>URL:</label>
+                <label>群聊链接或群名:</label>
                 <input type="text" id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
             </div>
             <div style="margin-bottom: 1rem;">
@@ -163,7 +163,7 @@
 <!-- 编辑URL模态框 -->
 <div id="editUrlModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 500px;">
-        <h3>编辑URL</h3>
+        <h3>编辑群聊</h3>
         <form onsubmit="saveEditedUrl(event)">
             <input type="hidden" id="editUrlId">
             <div style="margin-bottom: 1rem;">
