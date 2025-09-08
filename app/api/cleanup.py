@@ -1,13 +1,14 @@
+import ast
 import datetime
+
 from flask import jsonify, request
-from sqlalchemy import text
 
 from app import db
 from app.api import bp
 from app.auth.decorators import admin_required
 from app.models.cleanup_task import CleanupTask
 from app.models.config_data import ConfigData
-
+from loguru import logger
 
 @bp.route('/cleanup-tasks', methods=['GET'])
 @admin_required
@@ -168,29 +169,47 @@ def toggle_cleanup_task(task_id):
 @bp.route('/cleanup-tasks/<int:task_id>/execute', methods=['POST'])
 @admin_required
 def execute_cleanup_task(task_id):
-    """手动执行清理任务"""
     try:
         task = db.session.get(CleanupTask, task_id)
         if not task:
             return jsonify({'error': 'Task not found'}), 404
+        config_id_list = ast.literal_eval(task.target_configs)
+        type_list = ast.literal_eval(task.cleanup_types)
+        success_list = []
+        for type_ in type_list:
+            match type_:
+                case "status":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.status = ''
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
+                case "label":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.label = ''
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
+                case "counts":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.current_count = 0
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
 
-        # 执行清理
-        result = db.session.execute(
-            text( "SELECT execute_cleanup_task(:cleanup_types, :target_configs)"),
-            {
-                'cleanup_types': task.cleanup_types,
-                'target_configs': task.target_configs
-            }
-        )
-        affected_rows = result.scalar()
-
-        # 更新任务执行时间
+        affected_rows = len(success_list)
         task.last_run = datetime.datetime.now()
         task.calculate_next_run()
         db.session.commit()
 
         return jsonify({
-            'message': f'Task executed successfully. {affected_rows} records affected.',
+            'message': f'任务执行成功. {affected_rows} 受影响的记录。',
             'affected_rows': affected_rows,
             'task': task.to_dict()
         })
@@ -203,7 +222,6 @@ def execute_cleanup_task(task_id):
 @bp.route('/cleanup-tasks/configs', methods=['GET'])
 @admin_required
 def get_available_configs():
-    """获取可用的配置列表"""
     try:
         configs = ConfigData.query.filter_by(is_active=True).all()
         return jsonify([

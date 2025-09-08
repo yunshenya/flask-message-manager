@@ -1674,7 +1674,7 @@ async function saveDashboardCleanupTask(event) {
 
     const data = {
         name: autoName,
-        description: `自动生成的清理任务：每日${timeStr}清理${typesText}`,
+        description: `每日${timeStr}清理${typesText}`,
         schedule_time: document.getElementById('dashboardCleanupTaskTime').value,
         cleanup_types: cleanupTypes,
         target_configs: targetConfigs.length > 0 ? targetConfigs : null,

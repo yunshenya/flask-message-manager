@@ -1,3 +1,4 @@
+import ast
 import datetime
 import threading
 import time
@@ -5,6 +6,7 @@ import time
 from loguru import logger
 
 from app import db
+from app.models import ConfigData
 from app.models.cleanup_task import CleanupTask
 
 
@@ -13,15 +15,36 @@ def _execute_task(task: CleanupTask):
     logger.info(f"开始执行清理任务: {task.name}")
 
     try:
-        # 执行清理
-        result = db.session.execute(
-            "SELECT execute_cleanup_task(:cleanup_types, :target_configs)",
-            {
-                'cleanup_types': task.cleanup_types,
-                'target_configs': task.target_configs
-            }
-        )
-        affected_rows = result.scalar()
+        config_id_list = ast.literal_eval(task.target_configs)
+        type_list = ast.literal_eval(task.cleanup_types)
+        success_list = []
+        for type_ in type_list:
+            match type_:
+                case "status":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.status = ''
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
+                case "label":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.label = ''
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
+                case "counts":
+                    for config_id in config_id_list:
+                        config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
+                        for url in config.urls:
+                            url.current_count = 0
+                            url.updated_at = datetime.datetime.now()
+                            db.session.commit()
+                            success_list.append(url.id)
+        affected_rows = len(success_list)
 
         # 更新任务状态
         task.last_run = datetime.datetime.now()
