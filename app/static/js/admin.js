@@ -266,7 +266,7 @@ async function batchStopMachines() {
 }
 
 async function syncNewMachines() {
-    if (!await showConfirm('确认同步', '确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
+    if (!await showConfirm('确认同步', '确定要从VMOS同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
         return;
     }
 

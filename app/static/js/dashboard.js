@@ -19,22 +19,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (document.hidden) {
             // 页面隐藏时停止更新
             stopDurationUpdates();
-            console.log('⏸️ 页面隐藏，停止实时更新');
+            console.log('页面隐藏，停止实时更新');
         } else {
             // 页面显示时恢复更新并强制刷新
-            console.log('👁️ 页面显示，恢复实时更新');
+            console.log('页面显示，恢复实时更新');
             if (isWebSocketConnected && currentConfigId) {
                 startDurationUpdates();
                 // 强制刷新确保状态同步
                 loadDashboardData().then(() => {
-                    console.log('✅ 状态同步完成');
+                    console.log('状态同步完成');
                 }).catch(error => {
-                    console.error('❌ 状态同步失败:', error);
+                    console.error('状态同步失败:', error);
                 });
             } else if (currentConfigId) {
-                // 如果WebSocket未连接，也要刷新数据
                 loadDashboardData().then(() => {
-                    console.log('✅ 数据刷新完成（WebSocket未连接）');
+                    console.log('数据刷新完成（WebSocket未连接）');
                 });
             }
         }
@@ -52,7 +51,6 @@ function initWebSocket() {
     }
 
     try {
-        // 如果已有连接，先断开
         if (socket) {
             socket.disconnect();
             socket = null;
@@ -60,16 +58,16 @@ function initWebSocket() {
 
         // 修改连接配置，解决升级问题
         socket = io('/', {
-            transports: ['polling', 'websocket'],  // 先尝试 polling，再升级到 websocket
-            upgrade: true,                         // 允许升级
-            timeout: 20000,                        // 增加超时时间
-            forceNew: true,                        // 强制新连接
-            reconnection: true,                    // 启用重连
-            reconnectionAttempts: 5,               // 重连尝试次数
+            transports: ['polling', 'websocket'],
+            upgrade: true,
+            timeout: 20000,
+            forceNew: true,
+            reconnection: true,
+            reconnectionAttempts: 5,
             reconnectionDelay: 1000,
-            maxHttpBufferSize: 1e6,               // 增加缓冲区大小
-            pingTimeout: 60000,                    // ping 超时
-            pingInterval: 25000                    // ping 间隔
+            maxHttpBufferSize: 1e6,
+            pingTimeout: 60000,
+            pingInterval: 25000
     });
 
         setupWebSocketEvents();
@@ -83,7 +81,7 @@ function initWebSocket() {
 // 设置 WebSocket 事件监听
 function setupWebSocketEvents() {
     socket.on('connect', function() {
-        console.log('✅ WebSocket 连接成功');
+        console.log('WebSocket 连接成功');
         isWebSocketConnected = true;
 
         // 防止重复通知
@@ -95,7 +93,7 @@ function setupWebSocketEvents() {
     });
 
     socket.on('disconnect', function(reason) {
-        console.log('❌ WebSocket 连接断开:', reason);
+        console.log('WebSocket 连接断开:', reason);
         isWebSocketConnected = false;
         isWebSocketInitialized = false;
 
@@ -208,7 +206,7 @@ function removeFromRunningUrlsCache(urlId) {
     if (runningUrls.has(urlId)) {
         const urlInfo = runningUrls.get(urlId);
         runningUrls.delete(urlId);
-        console.log(`➖ 从缓存移除已停止URL: ${urlInfo.name}`);
+        console.log(`➖ 从缓存移除已停止群聊: ${urlInfo.name}`);
     }
 }
 
@@ -378,7 +376,6 @@ async function loadDashboardData() {
         let urlsToDisplay;
         if (currentFilter.isActive && currentFilter.type === 'label') {
             await applyCurrentFilter();
-            // 获取筛选后的URL来初始化缓存
             const filteredResponse = await apiCall(`/api/urls/by-label/${encodeURIComponent(currentFilter.value)}?config_id=${currentConfigId}`);
             urlsToDisplay = filteredResponse.urls;
         } else {
@@ -844,7 +841,7 @@ async function editUrl(urlId) {
         showEditUrlModal();
     } catch (error) {
         console.error('获取URL信息失败:', error);
-        showError("失败", '获取URL信息失败');
+        showError("失败", '获取群聊信息失败');
     }
 }
 
@@ -879,7 +876,7 @@ async function saveEditedUrl(event) {
             body: JSON.stringify(data)
         });
 
-        showSuccess("成功", 'URL更新成功!');
+        showSuccess("成功", '群聊更新成功!');
         hideEditUrlModal();
         await loadDashboardData();
     } catch (error) {
@@ -979,7 +976,7 @@ async function resetAllUrls() {
         return;
     }
 
-    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有URL的运行状态。', 'danger')) return;
+    if (!await showConfirm('确认重置', '确定要重置当前机器所有URL的执行计数吗？这将同时停止所有群聊的运行状态。', 'danger')) return;
 
     try {
         const result = await apiCall(`/api/config/${currentConfigId}/reset`, { method: 'POST' });
@@ -1333,7 +1330,7 @@ window.addEventListener('beforeunload', () => {
 
 
 async function syncNewMachines() {
-    if (!await showConfirm('确认同步', '确定要从VMOS API同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
+    if (!await showConfirm('确认同步', '确定要从VMOS同步新机器吗？这将自动添加新机器到系统中。', 'primary')) {
         return;
     }
 
@@ -1451,7 +1448,7 @@ async function deleteLabel(label) {
         return;
     }
 
-    if (!await showConfirm('确认删除', `确定要删除标签 "${label}" 吗？这将清空所有使用该标签的URL的标签信息。`, 'danger')) {
+    if (!await showConfirm('确认删除', `确定要删除标签 "${label}" 吗？这将清空所有使用该标签的群聊的标签信息。`, 'danger')) {
         return;
     }
 
@@ -1473,7 +1470,7 @@ async function deleteLabel(label) {
 }
 
 async function removeUrlLabel(urlId, urlName, currentLabel) {
-    if (!await showConfirm('确认删除', `确定要删除URL "${urlName}" 的标签 "${currentLabel}" 吗？`, 'danger')) {
+    if (!await showConfirm('确认删除', `确定要删除群聊 "${urlName}" 的标签 "${currentLabel}" 吗？`, 'danger')) {
         return;
     }
 
@@ -1482,11 +1479,11 @@ async function removeUrlLabel(urlId, urlName, currentLabel) {
             method: 'POST'
         });
         console.log(result);
-        showSuccess("成功", `已删除URL "${urlName}" 的标签`);
+        showSuccess("成功", `已删除群聊 "${urlName}" 的标签`);
         await loadDashboardData();
         await loadLabelStats();
     } catch (error) {
-        console.error('删除URL标签失败:', error);
-        showError('删除URL标签失败:', error)
+        console.error('删除群聊标签失败:', error);
+        showError('删除群聊标签失败:', error)
     }
 }

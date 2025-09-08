@@ -8,13 +8,11 @@ class NotificationSystem {
     }
 
     init() {
-        // 创建通知容器
         this.container = document.createElement('div');
         this.container.className = 'notification-container';
         this.container.id = 'notificationContainer';
         document.body.appendChild(this.container);
 
-        // 创建确认对话框容器
         this.confirmOverlay = document.createElement('div');
         this.confirmOverlay.className = 'confirm-overlay';
         this.confirmOverlay.id = 'confirmOverlay';
@@ -182,11 +180,9 @@ window.showConfirm = (title, message, type = 'primary') => {
     if (window.notificationSystem) {
         return window.notificationSystem.showConfirm(title, message, type);
     }
-    // 降级到原生confirm
     return Promise.resolve(confirm(`${title}: ${message}`));
 };
 
-// 确保DOM加载完成后初始化
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
         window.notificationSystem = new NotificationSystem();

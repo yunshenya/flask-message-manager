@@ -4,6 +4,7 @@ from typing import List
 from sqlalchemy.orm import relationship, Mapped
 
 from app import db
+from app.models.url_data import UrlData
 
 
 class ConfigData(db.Model):
@@ -20,7 +21,7 @@ class ConfigData(db.Model):
     name = db.Column(db.Text)
     message = db.Column(db.Text)
 
-    urls: Mapped[List["UrlData"]] = relationship(backref='config', cascade='all, delete-orphan')
+    urls: Mapped[List[UrlData]] = relationship(backref='config', cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
