@@ -83,7 +83,6 @@ def init_database():
 if __name__ == '__main__':
     if init_database():
         logger.info("访问地址: http://localhost:5000")
-
         # 启动清理调度器
         cleanup_scheduler.start()
 
@@ -93,5 +92,4 @@ if __name__ == '__main__':
         else:
             socketio.run(app, host='0.0.0.0', port=5000)
     finally:
-        # 确保在应用关闭时停止调度器
         cleanup_scheduler.stop()
