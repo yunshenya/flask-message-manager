@@ -60,7 +60,7 @@ def get_config_status(config_id):
         if not config:
             return jsonify({'error': 'Config not found'}), 404
 
-        urls = UrlData.query.filter_by(config_id=config_id).all()
+        urls = UrlData.query.filter_by(config_id=config_id, is_active=True).all()
 
         stats = {
             'config': config.to_dict(),
