@@ -16,8 +16,8 @@
     <h1>消息管理系统</h1>
     <div class="user-info">
         <span>欢迎, {{ current_user.username }}</span>
-        {% if current_user.is_admin %}<span class="btn btn-warning">管理员</span>{% endif %}
-        <a class="btn btn-danger" href="{{ url_for('auth.logout') }}">退出</a>
+        {% if current_user.is_admin %}<a class="btn btn-warning" href="/admin">管理员</a>{% endif %}
+        <a class="btn btn-danger" href="/auth/logout">退出</a>
     </div>
 </div>
 
@@ -160,24 +160,32 @@
         <form onsubmit="addUrl(event)">
             <div style="margin-bottom: 1rem;">
                 <label>群聊链接或群名:</label>
-                <input id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="text">
+                <label for="newUrl">
+                    <input id="newUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
+                </label>
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>名称:</label>
-                <input id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="text">
+                <label for="newName">
+                    <input id="newName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
+                </label>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>持续时间(秒):</label>
-                    <input id="newDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
-                           value="30">
+                    <label for="newDuration">
+                        <input id="newDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
+                               value="30">
+                    </label>
                 </div>
                 <div>
                     <label>最大执行次数:</label>
-                    <input id="newMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
-                           value="3">
+                    <label for="newMaxNum">
+                        <input id="newMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" type="number"
+                               value="3">
+                    </label>
                 </div>
             </div>
             <div style="text-align: right;">
@@ -197,24 +205,32 @@
             <input id="editUrlId" type="hidden">
             <div style="margin-bottom: 1rem;">
                 <label>群聊链接或名称</label>
-                <input id="editUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="text">
+                <label for="editUrl">
+                    <input id="editUrl" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
+                </label>
             </div>
             <div style="margin-bottom: 1rem;">
                 <label>名称:</label>
-                <input id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="text">
+                <label for="editName">
+                    <input id="editName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                           type="text">
+                </label>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>持续时间(秒):</label>
-                    <input id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="number">
+                    <label for="editDuration">
+                        <input id="editDuration" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                               type="number">
+                    </label>
                 </div>
                 <div>
                     <label>最大执行次数:</label>
-                    <input id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="number">
+                    <label for="editMaxNum">
+                        <input id="editMaxNum" min="1" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                               type="number">
+                    </label>
                 </div>
             </div>
             <div style="margin-bottom: 1rem;">
@@ -268,7 +284,7 @@
 
             <div style="margin-bottom: 1rem;">
                 <label>🖥️ 目标机器:</label>
-                <select id="dashboardCleanupTargetConfigs" multiple style="width: 100%; height: 120px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem;">
+                <label for="dashboardCleanupTargetConfigs"></label><select id="dashboardCleanupTargetConfigs" multiple style="width: 100%; height: 120px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.5rem;">
                     <option value="">全部机器</option>
                 </select>
                 <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.5rem; border-radius: 4px; font-size: 0.85rem; margin-top: 0.5rem;">
@@ -320,20 +336,20 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>机器名称:</label>
-                    <input id="dashboardEditMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="text">
+                    <label for="dashboardEditMachineName"></label><input id="dashboardEditMachineName" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                         type="text">
                 </div>
                 <div>
                     <label>机器代码:</label>
-                    <input id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="text">
+                    <label for="dashboardEditMachineCode"></label><input id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                         type="text">
                 </div>
             </div>
 
             <div style="margin-bottom: 1rem;">
                 <label>描述:</label>
-                <input id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="text">
+                <label for="dashboardEditMachineDesc"></label><input id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                     type="text">
             </div>
 
             <!-- 多消息编辑区域 -->
@@ -356,20 +372,20 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label>成功时间范围 (秒) - 最小值:</label>
-                    <input id="dashboardEditSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="number">
+                    <label for="dashboardEditSuccessTimeMin"></label><input id="dashboardEditSuccessTimeMin" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                            type="number">
                 </div>
                 <div>
                     <label>成功时间范围 (秒) - 最大值:</label>
-                    <input id="dashboardEditSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="number">
+                    <label for="dashboardEditSuccessTimeMax"></label><input id="dashboardEditSuccessTimeMax" min="1" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                            type="number">
                 </div>
             </div>
 
             <div style="margin-bottom: 1rem;">
                 <label>重置时间 (小时):</label>
-                <input id="dashboardEditResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                       type="number">
+                <label for="dashboardEditResetTime"></label><input id="dashboardEditResetTime" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                                                                   type="number">
             </div>
 
             <div style="margin-bottom: 1.5rem;">
