@@ -13,7 +13,7 @@ class UrlData(db.Model):
     url = db.Column(db.String(500), nullable=False)
     name = db.Column(db.String(200), nullable=False)
     duration = db.Column(db.Integer, nullable=False, default=30)
-    last_time = db.Column(db.DateTime, nullable=True, default=datetime.datetime.now())
+    last_time = db.Column(db.DateTime, nullable=False)
     max_num = db.Column(db.Integer, nullable=False, default=3)
     current_count = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
@@ -34,7 +34,7 @@ class UrlData(db.Model):
             'name': self.name,
             'label': self.label or '',
             'duration': self.duration,
-            'Last_time': self.last_time.isoformat() if self.last_time else None,
+            'Last_time': self.last_time,
             'max_num': self.max_num,
             'current_count': self.current_count,
             'is_active': self.is_active,
@@ -55,7 +55,6 @@ class UrlData(db.Model):
         """执行URL并更新计数，如果达到最大次数则自动停止运行"""
         if self.can_execute():
             self.current_count += 1
-            self.last_time = datetime.datetime.now()
             self.updated_at = datetime.datetime.now()
 
             # 如果达到最大次数，自动停止运行

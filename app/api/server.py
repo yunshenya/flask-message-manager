@@ -483,3 +483,28 @@ def get_running_durations(config_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route("/update_last_time", methods=["POST"])
+@token_required
+def update_last_time():
+    try:
+        url_id = request.json.get('url_id')
+        last_time = request.json.get('last_time')
+        url = UrlData.query.filter(UrlData.id == url_id).one()
+
+        if not url:
+            return jsonify({
+                'error': f'No URLs found "{url_id}"'
+            }), 404
+
+        url.last_time = last_time
+        db.session.commit()
+        return jsonify({
+            'message': f'Successfully update {url_id} last time',
+            'url_id': url_id
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
