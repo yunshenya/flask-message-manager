@@ -30,12 +30,12 @@ def init_database():
                 for data in data_list:
                     machines.append(
                         {
-                            'message': '哈咯----签到',
+                            'message': None,
                             'pade_code': data['padCode'],
                             'description': f'{data["goodName"]}',
-                            'success_time_min': 5,
-                            'success_time_max': 10,
-                            'reset_time': 0,
+                            'success_time_min': int(Config.success_time_min),
+                            'success_time_max': int(Config.success_time_max),
+                            'reset_time': int(Config.reset_time),
                             'name': data['padName'],
                         }
                     )
@@ -46,23 +46,6 @@ def init_database():
                     db.session.flush()  # 获取ID
                     config_ids.append(config.id)
                     print(f"创建机器配置: {machine_data['name']} ({machine_data['pade_code']})")
-
-                telegram_urls = [
-                    {'url': 'https://t.me/baolidb', 'name': '保利担保', 'duration': 30, 'max_num': 3},
-                    {'url': 'https://t.me/zhonghua2014tianxiang', 'name': '中华天象', 'duration': 30, 'max_num': 3},
-                    {'url': 'https://t.me/lianheshequ424', 'name': '联合社区', 'duration': 30, 'max_num': 3},
-                    {'url': 'https://t.me/make_friends1', 'name': 'make_friends', 'duration': 30, 'max_num': 3}
-                ]
-
-                for ids in config_ids:
-                    for url_data in telegram_urls:
-                        url = UrlData(
-                            config_id=ids,
-                            **url_data
-                        )
-                        db.session.add(url)
-
-                logger.info(f"为 {len(config_ids)} 台机器创建了URL配置")
 
             db.session.commit()
             logger.info("数据库初始化完成!")

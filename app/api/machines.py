@@ -321,13 +321,13 @@ def sync_new_machines():
         for vmos_machine in new_machines:
             try:
                 new_machine = ConfigData(
-                    message='哈咯----签到',
+                    message= None,
                     pade_code=vmos_machine.get('padCode'),
                     name=vmos_machine.get('padName', f"Machine-{vmos_machine.get('padCode', 'Unknown')}"),
                     description=vmos_machine.get('goodName', ''),
-                    success_time_min=5,
-                    success_time_max=10,
-                    reset_time=0,
+                    success_time_min=int(Config.success_time_min),
+                    success_time_max=int(Config.success_time_max),
+                    reset_time=int(Config.reset_time),
                     is_active=True
                 )
 

@@ -1190,7 +1190,7 @@ async function loadMachineManagementList() {
                 </thead>
                 <tbody>
                     ${machines.map(machine => {
-            const message = machine.message || '-';
+            const message = machine.message || '暂无消息';
             const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
             return `
                         <tr>

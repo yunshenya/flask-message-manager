@@ -20,3 +20,6 @@ class Config:
     DEBUG = DEBUG_str.lower() == 'true' if DEBUG_str else False
     ACCESS_KEY = os.getenv('ACCESS_KEY')
     SECRET_ACCESS = os.getenv('SECRET_ACCESS')
+    success_time_min = os.getenv('SUCCESS_TIME_MIN')
+    success_time_max = os.getenv('SUCCESS_TIME_MAX')
+    reset_time = os.getenv('RESET_TIME')
