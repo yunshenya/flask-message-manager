@@ -3,7 +3,6 @@ let isWebSocketConnected = false;
 let durationUpdateInterval = null;
 let runningUrls = new Map();
 let isWebSocketInitialized = false;
-let lastNotificationTime = new Map();
 document.addEventListener('DOMContentLoaded', async () => {
     // 首先初始化 WebSocket
     initWebSocket();
@@ -83,12 +82,6 @@ function setupWebSocketEvents() {
     socket.on('connect', function () {
         console.log('WebSocket 连接成功');
         isWebSocketConnected = true;
-
-        // 防止重复通知
-        if (shouldShowNotification('connect')) {
-            showSuccess('连接成功', 'WebSocket 实时更新已启用');
-        }
-
         startDurationUpdates();
     });
 
@@ -96,19 +89,11 @@ function setupWebSocketEvents() {
         console.log('WebSocket 连接断开:', reason);
         isWebSocketConnected = false;
         isWebSocketInitialized = false;
-
-        if (shouldShowNotification('disconnect')) {
-            showWarning('连接断开', 'WebSocket 连接已断开，正在尝试重连...');
-        }
-
         stopDurationUpdates();
     });
 
     socket.on('connect_error', function (error) {
         console.error('WebSocket 连接错误:', error);
-        if (shouldShowNotification('error')) {
-            showError('连接错误', 'WebSocket 连接失败，请检查网络');
-        }
     });
 
     // 监听 URL 执行更新
@@ -155,19 +140,6 @@ function setupWebSocketEvents() {
     });
 }
 
-function shouldShowNotification(type, urlId = null) {
-    const now = Date.now();
-    const key = urlId ? `${type}_${urlId}` : type;
-    const lastTime = lastNotificationTime.get(key) || 0;
-
-    // 同类型通知间隔至少2秒
-    if (now - lastTime < 2000) {
-        return false;
-    }
-
-    lastNotificationTime.set(key, now);
-    return true;
-}
 
 // 启动运行时长更新
 function startDurationUpdates() {

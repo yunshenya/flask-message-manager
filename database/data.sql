@@ -1,15 +1,15 @@
 CREATE TABLE IF NOT EXISTS config_data (
                                             id SERIAL PRIMARY KEY,
                                             success_time_min INTEGER NOT NULL DEFAULT 5,
-                                           success_time_max INTEGER NOT NULL DEFAULT 10,
-                                           reset_time INTEGER NOT NULL DEFAULT 0,
-                                           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                           is_active BOOLEAN DEFAULT TRUE,
-                                           pade_code TEXT,
-                                           name TEXT,
-                                           description TEXT,
-                                           message varchar(100)
+                                            success_time_max INTEGER NOT NULL DEFAULT 10,
+                                            reset_time INTEGER NOT NULL DEFAULT 0,
+                                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                            is_active BOOLEAN DEFAULT TRUE,
+                                            pade_code TEXT,
+                                            name TEXT,
+                                            description TEXT,
+                                            message varchar(100)
 );
 
 -- 为配置表添加注释
