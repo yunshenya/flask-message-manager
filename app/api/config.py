@@ -44,6 +44,7 @@ def get_config_urls(config_id):
             'urls': [url.to_dict() | {'pade_code': config.pade_code} for url in urls],
             'total': len(urls),
             'active': len([url for url in urls if url.is_active]),
+            'inactive': len([url for url in urls if not url.is_active]),
             'available': len([url for url in urls if url.can_execute() and url.is_active]),
             'running': len([url for url in urls if url.is_running and url.is_active]),
         })

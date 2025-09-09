@@ -416,3 +416,60 @@ def get_vmos_status(status: int):
         case 3:
             return "开机中"
     return "未知"
+
+
+
+@bp.route('/machines/all', methods=['GET'])
+@admin_required
+def get_all_machines():
+    """获取所有机器列表（包括未激活的）"""
+    try:
+        include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
+
+        if include_inactive:
+            machines = ConfigData.query.order_by(ConfigData.id).all()
+        else:
+            machines = ConfigData.query.filter_by(is_active=True).order_by(ConfigData.id).all()
+
+        return jsonify({
+            'machines': [machine.to_dict() for machine in machines],
+            'total_count': len(machines),
+            'active_count': len([m for m in machines if m.is_active]),
+            'inactive_count': len([m for m in machines if not m.is_active])
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/machines/inactive', methods=['GET'])
+@admin_required
+def get_inactive_machines():
+    """获取所有未激活的机器"""
+    try:
+        machines = ConfigData.query.filter_by(is_active=False).order_by(ConfigData.id).all()
+        return jsonify([machine.to_dict() for machine in machines])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/machines/<int:machine_id>/activate', methods=['POST'])
+@admin_required
+def activate_machine(machine_id):
+    """激活指定机器"""
+    try:
+        machine = db.session.get(ConfigData, machine_id)
+        if not machine:
+            return jsonify({'error': 'Machine not found'}), 404
+
+        machine.is_active = True
+        machine.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'机器 "{machine.message}" 已激活',
+            'machine': machine.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+

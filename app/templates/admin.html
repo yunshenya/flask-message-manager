@@ -97,17 +97,48 @@
     <!-- 机器管理标签页 -->
     <div class="tab-content" id="machines-tab">
         <div class="card">
+            <!-- 机器统计信息显示区域 -->
+            <div id="machineStats"></div>
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h2>机器列表</h2>
-                <div>
-                    <button class="btn btn-info" onclick="refreshMachines()">刷新列表</button>
-                    <button class="btn btn-warning" onclick="showVmosMachinesList()">📋 查看VMOS机器</button>
-                    <button class="btn btn-success" onclick="syncNewMachines()">🔄 同步新机器</button>
-                    <hr style="margin: 0.5rem 0; border: none;">
-                    <button class="btn btn-success" onclick="batchStartMachines()">批量启动</button>
-                    <button class="btn btn-danger" onclick="batchStopMachines()">批量停止</button>
+                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                    <!-- 显示选项 -->
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
+                        <input type="checkbox" id="showInactiveCheckbox" onchange="loadMachines()">
+                        <span>显示未激活机器</span>
+                    </label>
+
+                    <!-- 操作按钮组 -->
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-info btn-sm" onclick="refreshMachines()">🔄 刷新列表</button>
+                        <button class="btn btn-warning btn-sm" onclick="showInactiveMachines()">👁️ 查看未激活</button>
+                        <button class="btn btn-secondary btn-sm" onclick="showVmosMachinesList()">📋 VMOS机器</button>
+                        <button class="btn btn-success btn-sm" onclick="syncNewMachines()">🔄 同步新机器</button>
+                    </div>
+
+                    <!-- 分隔线 -->
+                    <div style="border-left: 1px solid #ddd; height: 30px;"></div>
+
+                    <!-- 批量操作 -->
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-success btn-sm" onclick="batchStartMachines()">⚡ 批量启动</button>
+                        <button class="btn btn-danger btn-sm" onclick="batchStopMachines()">🛑 批量停止</button>
+                    </div>
                 </div>
             </div>
+
+            <!-- 提示信息 -->
+            <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 1rem; margin-bottom: 1rem;">
+                <h4 style="margin: 0 0 0.5rem 0; color: #1976d2;">💡 机器管理说明</h4>
+                <ul style="margin: 0; color: #1976d2; font-size: 0.9rem;">
+                    <li><strong>激活机器：</strong>只有激活的机器才会在仪表板下拉列表中显示</li>
+                    <li><strong>未激活机器：</strong>被禁用的机器会从主列表隐藏，但可以通过"查看未激活"按钮重新激活</li>
+                    <li><strong>显示选项：</strong>勾选"显示未激活机器"可以在主列表中看到所有机器</li>
+                    <li><strong>批量操作：</strong>可以一次性激活多台未激活的机器</li>
+                </ul>
+            </div>
+
             <div id="machinesTable">
                 <p>加载中...</p>
             </div>
@@ -353,6 +384,35 @@
                 <button class="btn btn-success" type="submit">💾 保存配置</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- 未激活机器管理模态框 -->
+<div id="inactiveMachinesModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1010;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 95%; max-width: 1200px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; color: #f57c00;">⚠️ 未激活机器管理</h3>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn btn-info btn-sm" onclick="showInactiveMachines()">🔄 刷新列表</button>
+                <button class="btn btn-secondary btn-sm" onclick="hideInactiveMachinesModal()">✕ 关闭</button>
+            </div>
+        </div>
+
+        <!-- 警告提示 -->
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            <strong>⚠️ 注意：</strong>
+            <ul style="margin: 0.5rem 0 0 1rem;">
+                <li>未激活的机器不会出现在仪表板的机器选择列表中</li>
+                <li>激活机器后，它将重新出现在主管理界面和仪表板中</li>
+                <li>您可以在激活前先编辑机器的配置信息</li>
+                <li>删除操作将永久删除机器及其所有相关配置</li>
+            </ul>
+        </div>
+
+        <div id="inactiveMachinesList">
+            <!-- 未激活机器列表将在这里动态加载 -->
+        </div>
     </div>
 </div>
 </body>

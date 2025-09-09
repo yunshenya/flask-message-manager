@@ -381,3 +381,72 @@ def remove_url_label(url_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/url/<int:url_id>/activate', methods=['POST'])
+@login_required
+def activate_url(url_id):
+    """激活单个URL"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        url.is_active = True
+        url.updated_at = datetime.datetime.now()
+        db.session.commit()
+
+        return jsonify({
+            'message': f'群聊 "{url.name}" 已激活',
+            'url_data': url.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/config/<int:config_id>/urls/inactive', methods=['GET'])
+@login_required
+def get_inactive_urls(config_id):
+    """获取配置下的所有未激活URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(config_id=config_id, is_active=False).order_by(UrlData.id).all()
+
+        return jsonify({
+            'config_id': config_id,
+            'urls': [url.to_dict() for url in urls],
+            'total': len(urls)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/config/<int:config_id>/urls/batch-activate', methods=['POST'])
+@login_required
+def batch_activate_urls(config_id):
+    """批量激活配置下的所有未激活URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(config_id=config_id, is_active=False).all()
+
+        activated_count = 0
+        for url in urls:
+            url.is_active = True
+            url.updated_at = datetime.datetime.now()
+            activated_count += 1
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'成功激活 {activated_count} 个群聊',
+            'activated_count': activated_count
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

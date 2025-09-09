@@ -101,8 +101,18 @@ async function apiCall(url, options = {}) {
 // 加载机器列表
 async function loadMachines() {
     try {
-        const machines = await apiCall('/api/machines');
+        const includeInactive = document.getElementById('showInactiveCheckbox')?.checked || false;
+        const endpoint = includeInactive ? '/api/machines/all?include_inactive=true' : '/api/machines';
+
+        const response = await apiCall(endpoint);
+        const machines = response.machines || response;
+
         displayMachines(machines);
+
+        // 更新统计信息
+        if (response.total_count !== undefined) {
+            updateMachineStats(response);
+        }
     } catch (error) {
         document.getElementById('machinesTable').innerHTML = '<p>加载失败</p>';
     }
@@ -996,4 +1006,256 @@ async function syncFromEnvFile() {
     } catch (error) {
         // 错误已在apiCall中处理
     }
+}
+
+// 显示未激活机器列表
+async function showInactiveMachines() {
+    try {
+        const machines = await apiCall('/api/machines/inactive');
+
+        if (machines.length === 0) {
+            showInfo('提示', '没有找到未激活的机器');
+            return;
+        }
+
+        displayInactiveMachines(machines);
+        document.getElementById('inactiveMachinesModal').style.display = 'block';
+    } catch (error) {
+        console.error('获取未激活机器失败:', error);
+    }
+}
+
+// 显示未激活机器模态框
+function displayInactiveMachines(machines) {
+    const listDiv = document.getElementById('inactiveMachinesList');
+
+    listDiv.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <h4>未激活的机器 (${machines.length} 台)</h4>
+            <p style="color: #666;">以下机器当前处于未激活状态，您可以选择激活它们：</p>
+        </div>
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead style="background: #f8f9fa;">
+                    <tr>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">ID</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">名称</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">消息</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">代码</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">描述</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">创建时间</th>
+                        <th style="padding: 0.75rem; border: 1px solid #ddd;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${machines.map(machine => {
+        const message = machine.message || '-';
+        return `
+                            <tr style="background: #fff8dc;">
+                                <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.id}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd;">
+                                    <span style="cursor: pointer; color: #007bff; text-decoration: underline;" 
+                                          onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
+                                        ${message.length > 20 ? message.substring(0, 20) + '...' : message}
+                                    </span>
+                                </td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd; font-family: monospace;">${machine.pade_code}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.description || '-'}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
+                                <td style="padding: 0.75rem; border: 1px solid #ddd;">
+                                    <button class="btn btn-success btn-sm" onclick="activateMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')">
+                                        ✅ 激活
+                                    </button>
+                                    <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id}); hideInactiveMachinesModal();">
+                                        ✏️ 编辑
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')">
+                                        🗑️ 删除
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+    }).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top: 1rem; text-align: center;">
+            <button class="btn btn-success" onclick="batchActivateMachines()">
+                ⚡ 批量激活所有
+            </button>
+        </div>
+    `;
+}
+
+// 激活单个机器
+async function activateMachine(machineId, machineName) {
+    if (!await showConfirm('确认激活', `确定要激活机器 "${machineName}" 吗？激活后该机器将重新出现在主列表中。`, 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/machines/${machineId}/activate`, {
+            method: 'POST'
+        });
+
+        showSuccess('激活成功', result.message);
+
+        // 刷新未激活机器列表
+        await showInactiveMachines();
+
+        // 刷新主机器列表
+        await loadMachines();
+    } catch (error) {
+        console.error('激活机器失败:', error);
+    }
+}
+
+// 批量激活所有未激活机器
+async function batchActivateMachines() {
+    if (!await showConfirm('确认批量激活', '确定要激活所有未激活的机器吗？', 'primary')) {
+        return;
+    }
+
+    try {
+        const machines = await apiCall('/api/machines/inactive');
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const machine of machines) {
+            try {
+                await apiCall(`/api/machines/${machine.id}/activate`, {
+                    method: 'POST'
+                });
+                successCount++;
+            } catch (error) {
+                console.error(`激活机器 ${machine.id} 失败:`, error);
+                failCount++;
+            }
+        }
+
+        showSuccess('批量激活完成', `成功激活 ${successCount} 台机器，失败 ${failCount} 台`);
+
+        // 关闭模态框
+        hideInactiveMachinesModal();
+
+        // 刷新主机器列表
+        await loadMachines();
+    } catch (error) {
+        console.error('批量激活失败:', error);
+    }
+}
+
+// 隐藏未激活机器模态框
+function hideInactiveMachinesModal() {
+    document.getElementById('inactiveMachinesModal').style.display = 'none';
+}
+
+
+// 更新机器统计信息显示
+function updateMachineStats(stats) {
+    const statsDiv = document.getElementById('machineStats');
+    if (statsDiv) {
+        statsDiv.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div style="background: #e3f2fd; padding: 1rem; border-radius: 4px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #1976d2;">${stats.total_count}</div>
+                    <div>总机器数</div>
+                </div>
+                <div style="background: #e8f5e8; padding: 1rem; border-radius: 4px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #388e3c;">${stats.active_count}</div>
+                    <div>已激活</div>
+                </div>
+                <div style="background: #fff3e0; padding: 1rem; border-radius: 4px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #f57c00;">${stats.inactive_count}</div>
+                    <div>未激活</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+
+// 页面加载时的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 监听显示未激活机器复选框的变化
+    const checkbox = document.getElementById('showInactiveCheckbox');
+    if (checkbox) {
+        checkbox.addEventListener('change', function() {
+            const isChecked = this.checked;
+            showInfo('显示模式', isChecked ? '现在显示所有机器（包括未激活）' : '现在只显示激活的机器');
+        });
+    }
+});
+
+// 增强的displayMachines函数，支持显示未激活机器
+function displayMachines(machines) {
+    const tableDiv = document.getElementById('machinesTable');
+
+    if (machines.length === 0) {
+        tableDiv.innerHTML = '<p>暂无机器配置</p>';
+        return;
+    }
+
+    const tableHTML = `
+        <div style="overflow-x: auto;">
+            <table style="min-width: 1000px;">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 120px;">名称</th>
+                        <th style="width: 150px;">消息</th>
+                        <th style="width: 150px;">代码</th>
+                        <th style="width: 200px;">描述</th>
+                        <th style="width: 80px;">状态</th>
+                        <th style="width: 100px;">时间配置</th>
+                        <th style="width: 140px;">创建时间</th>
+                        <th style="width: 220px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${machines.map(machine => {
+        const message = machine.message || '-';
+        const displayMessage = message.length > 5 ? message.substring(0, 5) + '...' : message;
+        const isInactive = !machine.is_active;
+
+        return `
+                            <tr ${isInactive ? 'class="inactive-machine-row"' : ''}>
+                                <td style="width: 60px;">${machine.id}</td>
+                                <td style="width: 120px; word-wrap: break-word;">${machine.name || '-'}</td>
+                                <td style="width: 150px;">
+                                    <span class="message-link" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
+                                        ${displayMessage}
+                                    </span>
+                                </td>
+                                <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${machine.pade_code}</td>
+                                <td style="width: 200px; word-wrap: break-word;">${machine.description || '-'}</td>
+                                <td style="width: 80px;">
+                                    <span class="machine-status ${machine.is_active ? 'status-active' : 'inactive-status-badge'}">
+                                        ${machine.is_active ? '激活' : '未激活'}
+                                    </span>
+                                </td>
+                                <td style="width: 100px;">${machine.success_time[0]}-${machine.success_time[1]}秒</td>
+                                <td style="width: 140px; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
+                                <td style="width: 220px;">
+                                    ${isInactive ?
+            `<button class="btn btn-success btn-sm activate-btn" onclick="activateMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">✅ 激活</button>`
+            : ''
+        }
+                                    <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id})" style="margin: 2px;">编辑</button>
+                                    ${!isInactive ?
+            `<button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})" style="margin: 2px;">禁用</button>`
+            : ''
+        }
+                                    <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
+                                </td>
+                            </tr>
+                        `;
+    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    tableDiv.innerHTML = tableHTML;
 }

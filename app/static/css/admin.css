@@ -418,3 +418,70 @@ textarea[placeholder*="敏感信息"] {
     margin-top: 0.25rem;
     display: block;
 }
+
+/* 未激活机器的特殊样式 */
+.inactive-machine-row {
+    background-color: #fff8dc !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+.inactive-machine-row td {
+    color: #856404 !important;
+}
+
+.inactive-status-badge {
+    background-color: #ffc107 !important;
+    color: #212529 !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0.25rem !important;
+    font-size: 0.75rem !important;
+    font-weight: bold !important;
+}
+
+/* 激活按钮特殊样式 */
+.activate-btn {
+    background: linear-gradient(45deg, #28a745, #20c997) !important;
+    border: none !important;
+    color: white !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.3) !important;
+}
+
+.activate-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.4) !important;
+}
+
+/* 统计卡片样式 */
+.stats-card {
+    transition: transform 0.2s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* 显示选项复选框样式 */
+#showInactiveCheckbox {
+    transform: scale(1.2);
+    margin-right: 0.5rem;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    #inactiveMachinesModal > div {
+        width: 98% !important;
+        padding: 1rem !important;
+        max-height: 90vh !important;
+    }
+
+    .btn-group-responsive {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    .btn-group-responsive .btn {
+        width: 100% !important;
+    }
+}
