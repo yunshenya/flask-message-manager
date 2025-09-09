@@ -1857,7 +1857,7 @@ function displayInactiveUrls(urls) {
         return;
     }
 
-    const contentHTML = `
+    listDiv.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <h4>未激活的群聊 (${actuallyInactiveUrls.length} 个)</h4>
             <p style="color: #666;">以下群聊当前处于未激活状态，您可以选择激活它们：</p>
@@ -1904,8 +1904,6 @@ function displayInactiveUrls(urls) {
             </button>
         </div>
     `;
-
-    listDiv.innerHTML = contentHTML;
 }
 
 // 激活单个群聊

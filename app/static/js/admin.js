@@ -126,10 +126,12 @@ async function loadMachines() {
         if (response.total_count !== undefined) {
             updateMachineStats(response);
         }
+
     } catch (error) {
         document.getElementById('machinesTable').innerHTML = '<p>加载失败</p>';
     }
 }
+
 
 // 切换机器状态
 async function toggleMachine(machineId) {
@@ -965,7 +967,10 @@ async function syncFromEnvFile() {
 // 显示未激活机器列表
 async function showInactiveMachines() {
     try {
-        const machines = await apiCall('/api/machines/inactive');
+        // 强制重新获取最新数据，不使用缓存
+        const machines = await apiCall(`/api/machines/inactive?_t=${Date.now()}`);
+
+        console.log('显示未激活机器，获取到:', machines); // 调试日志
 
         if (machines.length === 0) {
             showInfo('提示', '没有找到未激活的机器');
@@ -976,6 +981,7 @@ async function showInactiveMachines() {
         document.getElementById('inactiveMachinesModal').style.display = 'block';
     } catch (error) {
         console.error('获取未激活机器失败:', error);
+        showError('获取失败', '无法获取未激活机器列表');
     }
 }
 
@@ -983,9 +989,18 @@ async function showInactiveMachines() {
 function displayInactiveMachines(machines) {
     const listDiv = document.getElementById('inactiveMachinesList');
 
-    listDiv.innerHTML = `
+    // 过滤掉可能已经激活的机器（双重检查）
+    const actuallyInactiveMachines = machines.filter(machine => !machine.is_active);
+
+    if (actuallyInactiveMachines.length === 0) {
+        hideInactiveMachinesModal();
+        showInfo('提示', '所有机器都已激活！');
+        return;
+    }
+
+    const tableHTML = `
         <div style="margin-bottom: 1rem;">
-            <h4>未激活的机器 (${machines.length} 台)</h4>
+            <h4>未激活的机器 (${actuallyInactiveMachines.length} 台)</h4>
             <p style="color: #666;">以下机器当前处于未激活状态，您可以选择激活它们：</p>
         </div>
         <div style="overflow-x: auto;">
@@ -1002,10 +1017,10 @@ function displayInactiveMachines(machines) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${machines.map(machine => {
+                    ${actuallyInactiveMachines.map(machine => {
         const message = machine.message || '-';
         return `
-                            <tr style="background: #fff8dc;">
+                            <tr id="inactive-machine-${machine.id}" style="background: #fff8dc;" data-machine-id="${machine.id}">
                                 <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.id}</td>
                                 <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
                                 <td style="padding: 0.75rem; border: 1px solid #ddd;">
@@ -1018,13 +1033,14 @@ function displayInactiveMachines(machines) {
                                 <td style="padding: 0.75rem; border: 1px solid #ddd;">${machine.description || '-'}</td>
                                 <td style="padding: 0.75rem; border: 1px solid #ddd; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
                                 <td style="padding: 0.75rem; border: 1px solid #ddd;">
-                                    <button class="btn btn-success btn-sm" onclick="activateMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')">
+                                    <button class="btn btn-success btn-sm" onclick="activateMachineWithRemove(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" 
+                                            style="background: linear-gradient(45deg, #28a745, #20c997); border: none; color: white; margin: 2px;">
                                         ✅ 激活
                                     </button>
-                                    <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id}); hideInactiveMachinesModal();">
+                                    <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id}); hideInactiveMachinesModal();" style="margin: 2px;">
                                         ✏️ 编辑
                                     </button>
-                                    <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')">
+                                    <button class="btn btn-danger btn-sm" onclick="deleteMachineWithRemove(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">
                                         🗑️ 删除
                                     </button>
                                 </td>
@@ -1035,12 +1051,113 @@ function displayInactiveMachines(machines) {
             </table>
         </div>
         <div style="margin-top: 1rem; text-align: center;">
-            <button class="btn btn-success" onclick="batchActivateMachines()">
-                ⚡ 批量激活所有
+            <button class="btn btn-success" onclick="batchActivateMachines()" 
+                    style="background: linear-gradient(45deg, #28a745, #20c997); border: none;">
+                ⚡ 批量激活所有机器 (${actuallyInactiveMachines.length})
             </button>
         </div>
     `;
+
+    listDiv.innerHTML = tableHTML;
 }
+
+async function activateMachineWithRemove(machineId, machineName) {
+    if (!await showConfirm('确认激活', `确定要激活机器 "${machineName}" 吗？`, 'primary')) {
+        return;
+    }
+
+    try {
+        // 先从界面移除该项目（立即反馈）
+        const machineElement = document.getElementById(`inactive-machine-${machineId}`);
+        if (machineElement) {
+            machineElement.style.opacity = '0.5';
+            machineElement.style.pointerEvents = 'none';
+        }
+
+        const result = await apiCall(`/api/machines/${machineId}/activate`, {
+            method: 'POST'
+        });
+
+        // 立即从DOM中移除
+        if (machineElement) {
+            machineElement.remove();
+        }
+
+        showSuccess('激活成功', result.message);
+
+        // 检查是否还有未激活的机器
+        const remainingMachines = document.querySelectorAll('#inactiveMachinesList [id^="inactive-machine-"]');
+        if (remainingMachines.length === 0) {
+            hideInactiveMachinesModal();
+            showInfo('完成', '所有机器都已激活！');
+        } else {
+            // 更新标题中的数量
+            const titleElement = document.querySelector('#inactiveMachinesList h4');
+            if (titleElement) {
+                titleElement.textContent = `未激活的机器 (${remainingMachines.length} 台)`;
+            }
+
+            // 更新批量激活按钮
+            const batchBtn = document.querySelector('#inactiveMachinesList .btn[onclick="batchActivateMachines()"]');
+            if (batchBtn) {
+                batchBtn.innerHTML = `⚡ 批量激活所有机器 (${remainingMachines.length})`;
+            }
+        }
+
+        // 后台刷新主机器列表
+        await loadMachines();
+
+    } catch (error) {
+        console.error('激活机器失败:', error);
+        // 恢复元素状态
+        if (machineElement) {
+            machineElement.style.opacity = '1';
+            machineElement.style.pointerEvents = 'auto';
+        }
+    }
+}
+
+async function deleteMachineWithRemove(machineId, machineName) {
+    if (!await showConfirm('确认删除', `确定要删除机器 "${machineName}" 吗？这将同时删除该机器的所有URL配置！此操作不可撤销。`, 'danger')) {
+        return;
+    }
+
+    try {
+        // 先从界面移除该项目
+        const machineElement = document.getElementById(`inactive-machine-${machineId}`);
+        if (machineElement) {
+            machineElement.style.opacity = '0.5';
+        }
+
+        const result = await apiCall(`/api/machines/${machineId}`, {
+            method: 'DELETE'
+        });
+
+        // 立即从DOM中移除
+        if (machineElement) {
+            machineElement.remove();
+        }
+
+        showSuccess('删除成功', result.message);
+
+        // 检查是否还有项目
+        const remainingMachines = document.querySelectorAll('#inactiveMachinesList [id^="inactive-machine-"]');
+        if (remainingMachines.length === 0) {
+            hideInactiveMachinesModal();
+        }
+
+        // 后台刷新主机器列表
+        loadMachines();
+
+    } catch (error) {
+        console.error('删除机器失败:', error);
+        // 恢复元素状态
+        if (machineElement) {
+            machineElement.style.opacity = '1';
+        }
+    }
+}
+
 
 // 激活单个机器
 async function activateMachine(machineId, machineName) {
@@ -1049,19 +1166,68 @@ async function activateMachine(machineId, machineName) {
     }
 
     try {
+        // 先从界面移除该项目（立即反馈）
+        const machineElement = document.querySelector(`tr[data-machine-id="${machineId}"]`) ||
+            document.getElementById(`inactive-machine-${machineId}`);
+        if (machineElement) {
+            machineElement.style.opacity = '0.5';
+            machineElement.style.pointerEvents = 'none';
+        }
+
         const result = await apiCall(`/api/machines/${machineId}/activate`, {
             method: 'POST'
         });
 
+        // 立即从DOM中移除
+        if (machineElement) {
+            machineElement.remove();
+        }
+
         showSuccess('激活成功', result.message);
 
-        // 刷新未激活机器列表
-        await showInactiveMachines();
+        // 检查是否还有未激活的机器
+        await checkAndUpdateInactiveMachinesList();
 
         // 刷新主机器列表
         await loadMachines();
+
     } catch (error) {
         console.error('激活机器失败:', error);
+        // 恢复元素状态
+        if (machineElement) {
+            machineElement.style.opacity = '1';
+            machineElement.style.pointerEvents = 'auto';
+        }
+    }
+}
+
+async function checkAndUpdateInactiveMachinesList() {
+    // 检查未激活机器窗口是否还开着
+    const modal = document.getElementById('inactiveMachinesModal');
+    if (!modal || modal.style.display === 'none') {
+        return; // 窗口已关闭，无需刷新
+    }
+
+    try {
+        // 强制获取最新的未激活机器数据
+        const machines = await apiCall(`/api/machines/inactive?_t=${Date.now()}`);
+
+        console.log('刷新未激活机器列表，获取到:', machines); // 调试日志
+
+        if (machines.length === 0) {
+            // 没有未激活机器了，关闭窗口
+            hideInactiveMachinesModal();
+            showInfo('提示', '所有机器都已激活！');
+            return;
+        }
+
+        // 更新显示
+        displayInactiveMachines(machines);
+
+    } catch (error) {
+        console.error('刷新未激活机器列表失败:', error);
+        // 发生错误时关闭窗口
+        hideInactiveMachinesModal();
     }
 }
 
@@ -1095,6 +1261,7 @@ async function batchActivateMachines() {
 
         // 刷新主机器列表
         await loadMachines();
+
     } catch (error) {
         console.error('批量激活失败:', error);
     }
