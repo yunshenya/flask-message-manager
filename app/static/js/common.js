@@ -180,7 +180,7 @@ function processBatchImport() {
         return;
     }
 
-    let newMessages = [];
+    let newMessages;
 
     // 尝试按行分割
     const lines = input.split('\n').map(line => line.trim()).filter(line => line);

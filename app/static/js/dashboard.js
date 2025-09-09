@@ -743,7 +743,7 @@ function updateLabelStats(labelStats) {
         return;
     }
 
-    const statsHTML = `
+    statsContainer.innerHTML = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             ${labelStats.map(stat => `
                 <div class="label-stat-card" style="background: white; padding: 1rem; border-radius: 4px; border-left: 4px solid #17a2b8;">
@@ -766,8 +766,6 @@ function updateLabelStats(labelStats) {
             `).join('')}
         </div>
     `;
-
-    statsContainer.innerHTML = statsHTML;
 }
 
 async function filterByLabel(label) {
@@ -2244,9 +2242,6 @@ function renderDashboardMessageList() {
     container.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <label style="font-weight: bold; color: #333;">发送的消息列表:</label>
-            <small style="display: block; color: #666; margin-top: 0.25rem;">
-                可以添加多条消息，系统会自动用"----"连接
-            </small>
         </div>
         
         <div id="dashboardMessagesList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; background: #f8f9fa;">
