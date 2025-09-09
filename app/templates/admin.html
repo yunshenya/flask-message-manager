@@ -23,6 +23,7 @@
         <div class="tab active" onclick="switchTab('users')">用户管理</div>
         <div class="tab" onclick="switchTab('machines')">机器管理</div>
         <div class="tab" onclick="switchTab('cleanup')">清理管理</div>
+        <div class="tab" onclick="switchTab('system-config')">系统配置</div>
     </div>
 
     <!-- 用户管理标签页 -->
@@ -267,6 +268,91 @@
         <div id="vmosMachinesContent">
             <!-- 内容将通过JavaScript动态加载 -->
         </div>
+    </div>
+</div>
+
+<!-- 添加系统配置标签页内容 -->
+<div class="tab-content" id="system-config-tab">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>系统配置管理</h2>
+            <div>
+                <button class="btn btn-info" onclick="loadSystemConfigs()">🔄 刷新配置</button>
+            </div>
+        </div>
+        <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 1rem; margin-bottom: 1rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #1976d2;">⚠️ 重要提示</h4>
+            <ul style="margin: 0; color: #1976d2; font-size: 0.9rem;">
+                <li>修改配置后需要重启应用才能生效</li>
+                <li>敏感信息（如密钥、密码）在界面中会被隐藏</li>
+                <li>建议在修改前先导出备份</li>
+                <li>数据库和API相关配置请谨慎修改</li>
+            </ul>
+        </div>
+        <div id="systemConfigsTable">
+            <p>加载中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- 添加/编辑系统配置模态框 -->
+<div id="addSystemConfigModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1005;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <h3>系统配置设置</h3>
+        <form onsubmit="saveSystemConfig(event)">
+            <input type="hidden" id="systemConfigId">
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                    <label>配置项名称 <span style="color: #dc3545;">*</span>:</label>
+                    <input id="systemConfigKey" required type="text" placeholder="例如: DATABASE_URL" style="font-family: monospace;">
+                    <small style="color: #6c757d;">通常为大写字母和下划线组成</small>
+                </div>
+                <div class="form-group">
+                    <label>分类:</label>
+                    <select id="systemConfigCategory">
+                        <option value="general">通用配置</option>
+                        <option value="database">数据库配置</option>
+                        <option value="security">安全配置</option>
+                        <option value="app">应用配置</option>
+                        <option value="vmos">VMOS配置</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>配置值 <span style="color: #dc3545;">*</span>:</label>
+                <textarea id="systemConfigValue" required rows="3" style="font-family: monospace; resize: vertical;" placeholder="请输入配置值"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>描述说明:</label>
+                <input id="systemConfigDescription" type="text" placeholder="简要描述此配置的用途">
+            </div>
+
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input id="systemConfigSensitive" type="checkbox">
+                    <span>🔒 敏感信息</span>
+                    <small style="color: #6c757d; margin-left: 0.5rem;">(密码、密钥等敏感数据)</small>
+                </label>
+            </div>
+
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+                <strong>💡 配置类型说明：</strong>
+                <ul style="margin: 0.5rem 0 0 1rem; font-size: 0.9rem;">
+                    <li><strong>数据库配置:</strong> DATABASE_URL 等数据库连接相关</li>
+                    <li><strong>安全配置:</strong> SECRET_KEY, API_SECRET_TOKEN 等密钥</li>
+                    <li><strong>应用配置:</strong> DEBUG, PKG_NAME 等应用设置</li>
+                    <li><strong>VMOS配置:</strong> ACCESS_KEY, SECRET_ACCESS 等VMOS API</li>
+                </ul>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+                <button class="btn btn-secondary" onclick="hideAddSystemConfigModal()" style="margin-right: 1rem;" type="button">取消</button>
+                <button class="btn btn-success" type="submit">💾 保存配置</button>
+            </div>
+        </form>
     </div>
 </div>
 </body>

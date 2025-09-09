@@ -2,4 +2,4 @@ from flask import Blueprint
 
 bp = Blueprint('api', __name__)
 
-from app.api import config, urls, users, server, machines, cleanup
+from app.api import config, urls, users, server, machines, cleanup, system_config

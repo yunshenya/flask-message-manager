@@ -343,3 +343,78 @@ input, select {
         transform: translateY(-100px);
     }
 }
+
+/* 统一输入框样式 */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+input[type="time"],
+textarea,
+select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+/* 等宽字体输入框 */
+.monospace-input,
+input[id*="Config"],
+textarea[id*="Config"] {
+    font-family: 'Courier New', Consolas, monospace;
+}
+
+/* 聚焦状态 */
+input:focus, textarea:focus, select:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* 必填字段标记 */
+.form-group label span[style*="color: #dc3545"] {
+    font-weight: bold;
+}
+
+/* 输入框容器 */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #555;
+    font-weight: 500;
+}
+
+/* 网格布局修复 */
+.form-group input[style*="grid"],
+.form-group select[style*="grid"],
+.form-group textarea[style*="grid"] {
+    width: 100%;
+}
+
+/* 敏感信息输入框样式 */
+input[placeholder*="敏感信息"],
+textarea[placeholder*="敏感信息"] {
+    background-color: #fff8dc;
+    border-color: #ffc107;
+}
+
+/* 小提示文字 */
+.form-group small {
+    color: #6c757d;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}

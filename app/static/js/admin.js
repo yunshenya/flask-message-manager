@@ -68,6 +68,10 @@ function switchTab(tabName) {
         });
     } else if (tabName === 'cleanup') {
         loadCleanupTasks().then(r => {});
+    } else if (tabName === 'system-config') {
+        loadSystemConfigs().then(r => {
+            console.log('系统配置已加载');
+        });
     }
 }
 
@@ -652,6 +656,343 @@ async function deleteCleanupTask(taskId, taskName) {
         });
         showSuccess('删除成功', result.message);
         await loadCleanupTasks();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+// ================================
+// 系统配置管理功能
+// ================================
+
+let systemConfigs = {};
+let currentEditingConfigId = null;
+
+async function exportToEnvFile() {
+    try {
+        const result = await apiCall('/api/system-configs/export-env');
+
+        // 创建下载链接
+        const blob = new Blob([result.content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+
+        showSuccess('导出成功', `配置已导出为 ${result.filename}`);
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function backupAndUpdateEnv() {
+    if (!await showConfirm('确认更新',
+        '确定要备份当前.env文件并用数据库配置更新吗？\n' +
+        '这将覆盖现有的.env文件，建议先导出备份。', 'warning')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall('/api/system-configs/backup-env', {
+            method: 'POST'
+        });
+
+        let message = result.message;
+        if (result.backup_created) {
+            message += `\n备份文件: ${result.backup_path}`;
+        }
+
+        showSuccess('更新成功', message);
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function initializeSystemConfigs() {
+    if (!await showConfirm('确认初始化',
+        '确定要初始化系统配置吗？\n' +
+        '这将从当前环境变量创建默认配置。', 'primary')) {
+        return;
+    }
+
+    try {
+        // 调用同步功能来初始化配置
+        await syncFromEnvFile();
+    } catch (error) {
+        showError('初始化失败', '无法初始化系统配置');
+    }
+}
+
+async function loadSystemConfigs() {
+    try {
+        const response = await apiCall('/api/system-configs');
+        systemConfigs = response.configs;
+        displaySystemConfigs(response.configs, response.categories);
+    } catch (error) {
+        document.getElementById('systemConfigsTable').innerHTML = '<p>加载系统配置失败</p>';
+    }
+}
+
+function displaySystemConfigs(configs, categories) {
+    const tableDiv = document.getElementById('systemConfigsTable');
+
+    if (Object.keys(configs).length === 0) {
+        tableDiv.innerHTML = `
+            <div style="text-align: center; padding: 3rem; color: #666;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">⚙️</div>
+                <h4>暂无系统配置</h4>
+                <p>点击"初始化配置"创建默认配置</p>
+                <button class="btn btn-success" onclick="initializeSystemConfigs()">🔧 初始化配置</button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div style="margin-bottom: 2rem;">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                <button class="btn btn-success btn-sm" onclick="showAddSystemConfigModal()">➕ 新增配置</button>
+                <button class="btn btn-info btn-sm" onclick="syncFromEnvFile()">📥 从.env同步</button>
+                <button class="btn btn-warning btn-sm" onclick="exportToEnvFile()">📤 导出.env</button>
+                <button class="btn btn-danger btn-sm" onclick="backupAndUpdateEnv()">💾 备份并更新.env</button>
+            </div>
+        </div>
+    `;
+
+    // 按分类显示配置
+    Object.entries(configs).forEach(([category, configList]) => {
+        const categoryName = categories[category] || category;
+        const categoryIcon = getCategoryIcon(category);
+
+        html += `
+            <div style="margin-bottom: 2rem; border: 1px solid #dee2e6; border-radius: 8px; overflow: hidden;">
+                <div style="background: #f8f9fa; padding: 1rem; border-bottom: 1px solid #dee2e6;">
+                    <h4 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                        ${categoryIcon} ${categoryName}
+                        <span style="font-size: 0.8rem; background: #6c757d; color: white; padding: 0.2rem 0.5rem; border-radius: 12px;">
+                            ${configList.length} 项
+                        </span>
+                    </h4>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="background: #f8f9fa;">
+                            <tr>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 200px;">配置项</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6;">值</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 250px;">描述</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 120px;">更新时间</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 200px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${configList.map(config => `
+                                <tr style="border-bottom: 1px solid #f0f0f0;">
+                                    <td style="padding: 0.75rem; font-family: monospace; font-weight: bold; color: #495057;">
+                                        ${config.key}
+                                        ${config.is_sensitive ? '<span style="color: #dc3545; font-size: 0.8rem;">🔒</span>' : ''}
+                                    </td>
+                                    <td style="padding: 0.75rem; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        ${config.is_sensitive
+            ? '<span style="color: #6c757d; font-style: italic;">***敏感信息已隐藏***</span>'
+            : `<span style="font-family: monospace; background: #f8f9fa; padding: 0.2rem 0.4rem; border-radius: 3px;">${config.value}</span>`
+        }
+                                    </td>
+                                    <td style="padding: 0.75rem; color: #6c757d; font-size: 0.9rem;">
+                                        ${config.description || '-'}
+                                    </td>
+                                    <td style="padding: 0.75rem; font-size: 0.85rem; color: #6c757d;">
+                                        ${config.updated_at ? new Date(config.updated_at).toLocaleString() : '-'}
+                                    </td>
+                                    <td style="padding: 0.75rem;">
+                                        <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+                                            <button class="btn btn-info btn-sm" onclick="editSystemConfig(${config.id})" title="编辑">✏️</button>
+                                            ${getTestButton(config.key)}
+                                            <button class="btn btn-danger btn-sm" onclick="deleteSystemConfig(${config.id}, '${config.key.replace(/'/g, '&#39;')}')" title="删除">🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    });
+
+    tableDiv.innerHTML = html;
+}
+
+function getCategoryIcon(category) {
+    const icons = {
+        'database': '🗄️',
+        'security': '🔐',
+        'app': '📱',
+        'vmos': '☁️',
+        'general': '⚙️'
+    };
+    return icons[category] || '⚙️';
+}
+
+function getTestButton(configKey) {
+    const testableConfigs = ['DATABASE_URL', 'ACCESS_KEY', 'SECRET_ACCESS'];
+    if (testableConfigs.includes(configKey)) {
+        return `<button class="btn btn-warning btn-sm" onclick="testSystemConfig('${configKey}')" title="测试连接">🧪</button>`;
+    }
+    return '';
+}
+
+async function showAddSystemConfigModal() {
+    // 清空表单
+    document.getElementById('systemConfigId').value = '';
+    document.getElementById('systemConfigKey').value = '';
+    document.getElementById('systemConfigValue').value = '';
+    document.getElementById('systemConfigDescription').value = '';
+    document.getElementById('systemConfigCategory').value = 'general';
+    document.getElementById('systemConfigSensitive').checked = false;
+
+    document.getElementById('addSystemConfigModal').style.display = 'block';
+}
+
+function hideAddSystemConfigModal() {
+    document.getElementById('addSystemConfigModal').style.display = 'none';
+    currentEditingConfigId = null;
+}
+
+async function saveSystemConfig(event) {
+    event.preventDefault();
+
+    const configId = document.getElementById('systemConfigId').value;
+    const isEdit = !!configId;
+
+    const data = {
+        key: document.getElementById('systemConfigKey').value.trim(),
+        value: document.getElementById('systemConfigValue').value,
+        description: document.getElementById('systemConfigDescription').value.trim(),
+        category: document.getElementById('systemConfigCategory').value,
+        is_sensitive: document.getElementById('systemConfigSensitive').checked
+    };
+
+    // 验证必填字段
+    if (!data.key || !data.value) {
+        showError('输入错误', '配置项和值不能为空');
+        return;
+    }
+
+    try {
+        if (isEdit) {
+            await apiCall(`/api/system-configs/${configId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showSuccess('更新成功', '系统配置已更新');
+        } else {
+            await apiCall('/api/system-configs', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showSuccess('创建成功', '系统配置已创建');
+        }
+
+        hideAddSystemConfigModal();
+        await loadSystemConfigs();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function editSystemConfig(configId) {
+    try {
+        // 在现有数据中查找配置
+        let config = null;
+        Object.values(systemConfigs).forEach(categoryConfigs => {
+            const found = categoryConfigs.find(c => c.id === configId);
+            if (found) config = found;
+        });
+
+        if (!config) {
+            showError('配置不存在', '找不到指定的配置项');
+            return;
+        }
+
+        currentEditingConfigId = configId;
+
+        // 填充表单
+        document.getElementById('systemConfigId').value = config.id;
+        document.getElementById('systemConfigKey').value = config.key;
+        document.getElementById('systemConfigValue').value = config.is_sensitive ? '' : config.value;
+        document.getElementById('systemConfigDescription').value = config.description || '';
+        document.getElementById('systemConfigCategory').value = config.category;
+        document.getElementById('systemConfigSensitive').checked = config.is_sensitive;
+
+        // 如果是敏感信息，添加提示
+        if (config.is_sensitive) {
+            const valueInput = document.getElementById('systemConfigValue');
+            valueInput.placeholder = '留空表示不修改敏感信息';
+        }
+
+        document.getElementById('addSystemConfigModal').style.display = 'block';
+    } catch (error) {
+        showError('加载失败', '获取配置信息失败');
+    }
+}
+
+async function deleteSystemConfig(configId, configKey) {
+    if (!await showConfirm('确认删除', `确定要删除配置项 "${configKey}" 吗？此操作不可撤销。`, 'danger')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/system-configs/${configId}`, {
+            method: 'DELETE'
+        });
+        showSuccess('删除成功', result.message);
+        await loadSystemConfigs();
+    } catch (error) {
+        // 错误已在apiCall中处理
+    }
+}
+
+async function testSystemConfig(configKey) {
+    try {
+        showInfo('测试中', `正在测试 ${configKey} 配置...`);
+
+        const result = await apiCall(`/api/system-configs/test-config/${configKey}`, {
+            method: 'POST'
+        });
+
+        if (result.test_result.success) {
+            showSuccess('测试成功', result.test_result.message);
+        } else {
+            showError('测试失败', result.test_result.message);
+        }
+    } catch (error) {
+        showError('测试失败', '无法执行配置测试');
+    }
+}
+
+async function syncFromEnvFile() {
+    if (!await showConfirm('确认同步', '确定要从.env文件同步配置吗？这将更新数据库中的配置。', 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall('/api/system-configs/sync-from-env', {
+            method: 'POST'
+        });
+
+        showSuccess('同步成功',
+            `从.env文件同步完成\n` +
+            `新增: ${result.created_count} 项\n` +
+            `更新: ${result.updated_count} 项\n` +
+            `总计: ${result.total_processed} 项`
+        );
+
+        await loadSystemConfigs();
     } catch (error) {
         // 错误已在apiCall中处理
     }

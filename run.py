@@ -1,7 +1,7 @@
 from typing import Any
 
 from app import create_app, db, Config, socketio
-from app.models import User, ConfigData, UrlData
+from app.models import User, ConfigData, UrlData, SystemConfig
 from app.services.cleanup_scheduler import cleanup_scheduler
 from app.utils.vmos import get_phone_list
 from loguru import logger
@@ -12,6 +12,7 @@ def init_database():
     try:
         with app.app_context():
             db.create_all()
+            SystemConfig.initialize_default_configs()
             admin_user = User.query.filter_by(username='admin').first()
             if not admin_user:
                 admin_user = User(
