@@ -147,14 +147,14 @@ function showBatchImportModal() {
         <div style="background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
             <h3>批量导入消息</h3>
             <div style="margin-bottom: 1rem;">
-                <label>消息列表 (每行一条消息):</label>
+                <label>消息列表:</label>
                 <textarea 
                     id="batchMessagesInput" 
                     rows="10" 
-                    placeholder="请输入消息，每行一条，例如：&#10;哈咯----签到&#10;早上好----打卡&#10;晚安----结束"
+                    placeholder="请输入消息，例如：&#10;早上好--------打卡&#10;晚安--------结束--------你好"
                     style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; resize: vertical;"
                 ></textarea>
-                <small style="color: #666;">支持的格式：每行一条消息，或使用"----"分隔的单行文本</small>
+                <small style="color: #666;">支持的格式：使用"--------"分隔的单行文本</small>
             </div>
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem;">
                 <button type="button" class="btn btn-secondary" onclick="closeBatchImportModal()" style="margin-right: 1rem;">取消</button>
@@ -182,13 +182,12 @@ function processBatchImport() {
 
     let newMessages;
 
-    // 尝试按行分割
-    const lines = input.split('\n').map(line => line.trim()).filter(line => line);
-    if (lines.length > 1) {
-        newMessages = lines;
+    if (input.includes('--------')) {
+        newMessages = input.split('--------')
+            .map(msg => msg.trim())
+            .filter(msg => msg);
     } else {
-        // 如果只有一行，尝试按"----"分割
-        newMessages = input.split('----').map(msg => msg.trim()).filter(msg => msg);
+        newMessages = [input.trim()];
     }
 
     if (newMessages.length === 0) {
