@@ -34,7 +34,7 @@ class UrlData(db.Model):
             'name': self.name,
             'label': self.label or '',
             'duration': self.duration,
-            'Last_time': self.last_time.isoformat(),
+            'Last_time': self.last_time.isoformat() if self.last_time else None,
             'max_num': self.max_num,
             'current_count': self.current_count,
             'is_active': self.is_active,
@@ -88,6 +88,7 @@ class UrlData(db.Model):
         """重置计数和运行状态"""
         self.current_count = 0
         self.is_running = False
+        self.last_time = None
         self.started_at = None
         self.stopped_at = None
         self.updated_at = datetime.datetime.now()

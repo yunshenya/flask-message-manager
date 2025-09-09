@@ -39,6 +39,7 @@ def _execute_task(task: CleanupTask):
                         config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
                         for url in config.urls:
                             url.current_count = 0
+                            url.last_time = None
                             url.updated_at = datetime.datetime.now()
                             success_list.append(url.id)
         affected_rows = len(success_list)

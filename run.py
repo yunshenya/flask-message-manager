@@ -86,7 +86,6 @@ if __name__ == '__main__':
 
         # 启动清理调度器
         cleanup_scheduler.start()
-        logger.info("清理调度器已启动")
 
     try:
         if Config.DEBUG:

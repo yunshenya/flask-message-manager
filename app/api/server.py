@@ -28,7 +28,7 @@ def callback():
         1003: lambda: logger.info("xxx"),
         1004: lambda: logger.info("xxx"),
         1006: lambda: logger.info("xxx"),
-        1007: lambda: logger.info("xxx"),
+        1007: lambda: logger.info("应用启动"),
         1009: lambda: logger.info("xxx"),
         1124: lambda: logger.info("xxx")
     }
@@ -180,7 +180,7 @@ def add_execute_num():
                 'url': url.url,
                 'current_count': url.current_count,
                 'remaining': url.max_num - url.current_count,
-                'last_time': url.last_time.isoformat(),
+                'last_time': url.last_time.isoformat() if url.last_time else None,
                 'is_running': url.is_running,
                 'running_duration': url.get_running_duration()
             })

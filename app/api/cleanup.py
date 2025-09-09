@@ -8,7 +8,7 @@ from app.api import bp
 from app.auth.decorators import admin_required
 from app.models.cleanup_task import CleanupTask
 from app.models.config_data import ConfigData
-from loguru import logger
+
 
 @bp.route('/cleanup-tasks', methods=['GET'])
 @admin_required
@@ -197,6 +197,7 @@ def execute_cleanup_task(task_id):
                         config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
                         for url in config.urls:
                             url.current_count = 0
+                            url.last_time = None
                             url.updated_at = datetime.datetime.now()
                             success_list.append(url.id)
 

@@ -2061,28 +2061,6 @@ document.addEventListener('keydown', function(e) {
 
 
 
-async function getFullUrlStatistics() {
-    if (!currentConfigId) return null;
-
-    try {
-        // 获取包含未激活群聊的完整数据
-        const response = await apiCall(`/api/config/${currentConfigId}/urls?include_inactive=true`);
-
-        console.log('完整统计数据:', response); // 调试日志
-
-        return {
-            total: response.total || 0,
-            active: response.active || 0,
-            inactive: response.inactive || 0,
-            available: response.available || 0,
-            running: response.running || 0
-        };
-    } catch (error) {
-        console.error('获取统计信息失败:', error);
-        return null;
-    }
-}
-
 
 
 function updateInactiveUrlsButton() {
@@ -2244,40 +2222,6 @@ async function deleteUrlWithRemove(urlId, urlName) {
     }
 }
 
-// 在 app/static/js/dashboard.js 中添加的多消息管理功能
-
-// 修改仪表板的编辑机器函数，支持多消息编辑
-async function editMachine(machineId) {
-    try {
-        const response = await apiCall(`/api/machines/${machineId}`);
-        const machine = response.machine;
-
-        currentEditingMachineId = machineId;
-
-        // 填充基本信息
-        document.getElementById('dashboardEditMachineId').value = machine.id;
-        document.getElementById('dashboardEditMachineName').value = machine.name || '';
-        document.getElementById('dashboardEditMachineCode').value = machine.pade_code || '';
-        document.getElementById('dashboardEditMachineDesc').value = machine.description || '';
-        document.getElementById('dashboardEditSuccessTimeMin').value = machine.success_time[0];
-        document.getElementById('dashboardEditSuccessTimeMax').value = machine.success_time[1];
-        document.getElementById('dashboardEditResetTime').value = machine.reset_time;
-        document.getElementById('dashboardEditMachineIsActive').checked = machine.is_active;
-
-        // 处理消息字段 - 先设置隐藏字段值再解析
-        const messageField = document.getElementById('dashboardEditMachineMessage');
-        messageField.value = machine.message || '';
-
-        // 解析消息为数组
-        const messages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
-        currentMessages = messages;
-
-        showEditMachineModal();
-    } catch (error) {
-        console.error('获取机器信息失败:', error);
-        showError("失败", '获取机器信息失败');
-    }
-}
 
 // 仪表板版本的渲染消息列表函数
 function renderDashboardMessageList() {
@@ -2291,9 +2235,6 @@ function renderDashboardMessageList() {
     container.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <label style="font-weight: bold; color: #333;">发送的消息列表:</label>
-            <small style="display: block; color: #666; margin-top: 0.25rem;">
-                可以添加多条消息，系统会自动用"----"连接
-            </small>
         </div>
         
         <div id="dashboardMessagesList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; background: #f8f9fa;">
