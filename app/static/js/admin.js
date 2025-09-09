@@ -1,11 +1,24 @@
 // 全局变量
 let currentEditingMachineId = null;
+// 全局变量存储消息列表
+let currentMessages = [];
 
 // 显示编辑机器模态框
 function showEditMachineModal() {
+    // 清空当前消息列表
+    currentMessages = [];
+
+    // 如果有现有消息，解析并添加到列表
+    const existingMessage = document.getElementById('editMachineMessage').value;
+    if (existingMessage) {
+        currentMessages = existingMessage.split('----').map(msg => msg.trim()).filter(msg => msg);
+    }
+
+    // 渲染消息列表
+    renderMessageList();
+
     document.getElementById('editMachineModal').style.display = 'block';
 }
-
 // 隐藏编辑机器模态框
 function hideEditMachineModal() {
     document.getElementById('editMachineModal').style.display = 'none';
@@ -118,71 +131,6 @@ async function loadMachines() {
     }
 }
 
-// 显示机器列表
-function displayMachines(machines) {
-    const tableDiv = document.getElementById('machinesTable');
-
-    if (machines.length === 0) {
-        tableDiv.innerHTML = '<p>暂无机器配置</p>';
-        return;
-    }
-
-    const tableHTML = `
-            <div style="overflow-x: auto;">
-                <table style="min-width: 1000px;">
-                    <thead>
-                        <tr>
-                            <th style="width: 60px;">ID</th>
-                            <th style="width: 120px;">名称</th>
-                            <th style="width: 150px;">消息</th>
-                            <th style="width: 150px;">代码</th>
-                            <th style="width: 200px;">描述</th>
-                            <th style="width: 80px;">状态</th>
-                            <th style="width: 100px;">时间配置</th>
-                            <th style="width: 140px;">创建时间</th>
-                            <th style="width: 200px;">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${machines.map(machine => {
-        const message = machine.message || '-';
-        const displayMessage = message.length > 5 ? message.substring(0, 5) + '...' : message;
-        return `
-                            <tr>
-                                <td style="width: 60px;">${machine.id}</td>
-                                <td style="width: 120px; word-wrap: break-word;">${machine.name || '-'}</td>
-                                <td style="width: 150px;">
-                                    <span class="message-link" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
-                                        ${displayMessage}
-                                    </span>
-                                </td>
-                                <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${machine.pade_code}</td>
-                                <td style="width: 200px; word-wrap: break-word;">${machine.description || '-'}</td>
-                                <td style="width: 80px;">
-                                    <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
-                                        ${machine.is_active ? '激活' : '禁用'}
-                                    </span>
-                                </td>
-                                <td style="width: 100px;">${machine.success_time[0]}-${machine.success_time[1]}秒</td>
-                                <td style="width: 140px; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
-                                <td style="width: 200px;">
-                                    <button class="btn btn-info" onclick="editMachine(${machine.id})" style="margin: 2px;">编辑</button>
-                                    <button class="btn btn-warning" onclick="toggleMachine(${machine.id})" style="margin: 2px;">
-                                        ${machine.is_active ? '禁用' : '激活'}
-                                    </button>
-                                    <button class="btn btn-danger" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
-                                </td>
-                            </tr>
-                        `
-    }).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-
-    tableDiv.innerHTML = tableHTML;
-}
-
 // 切换机器状态
 async function toggleMachine(machineId) {
     try {
@@ -199,22 +147,28 @@ async function toggleMachine(machineId) {
 
 async function editMachine(machineId) {
     try {
-        // 获取机器信息
         const response = await apiCall(`/api/machines/${machineId}`);
         const machine = response.machine;
 
         currentEditingMachineId = machineId;
 
-        // 填充编辑表单
+        // 填充基本信息
         document.getElementById('editMachineId').value = machine.id;
         document.getElementById('editMachineName').value = machine.name || '';
-        document.getElementById('editMachineMessage').value = machine.message || '';
         document.getElementById('editMachineCode').value = machine.pade_code || '';
         document.getElementById('editMachineDesc').value = machine.description || '';
         document.getElementById('editSuccessTimeMin').value = machine.success_time[0];
         document.getElementById('editSuccessTimeMax').value = machine.success_time[1];
         document.getElementById('editResetTime').value = machine.reset_time;
         document.getElementById('editIsActive').checked = machine.is_active;
+
+        // 处理消息字段 - 先设置值再解析
+        const messageField = document.getElementById('editMachineMessage');
+        messageField.value = machine.message || '';
+
+        // 解析消息为数组
+        const messages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
+        currentMessages = messages;
 
         showEditMachineModal();
     } catch (error) {
@@ -1188,7 +1142,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// 增强的displayMachines函数，支持显示未激活机器
 function displayMachines(machines) {
     const tableDiv = document.getElementById('machinesTable');
 
@@ -1197,7 +1150,7 @@ function displayMachines(machines) {
         return;
     }
 
-    const tableHTML = `
+    tableDiv.innerHTML = `
         <div style="overflow-x: auto;">
             <table style="min-width: 1000px;">
                 <thead>
@@ -1256,6 +1209,90 @@ function displayMachines(machines) {
             </table>
         </div>
     `;
-
-    tableDiv.innerHTML = tableHTML;
 }
+
+
+
+
+// 渲染消息列表UI
+function renderMessageList() {
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <label style="font-weight: bold; color: #333;">发送的消息列表:</label>
+        </div>
+        
+        <div id="messagesList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; background: #f8f9fa;">
+            ${currentMessages.length === 0 ?
+        '<p style="color: #666; text-align: center; margin: 1rem 0;">暂无消息，请点击下方按钮添加</p>' :
+        currentMessages.map((msg, index) => `
+                    <div class="message-item" style="display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.5rem; background: white; border-radius: 4px; border: 1px solid #e0e0e0;">
+                        <span style="flex: 1; padding-right: 1rem; word-break: break-all;">${msg}</span>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button type="button" class="btn btn-info btn-sm" onclick="editMessage(${index})" title="编辑">✏️</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageUp(${index})" title="上移" ${index === 0 ? 'disabled' : ''}>↑</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageDown(${index})" title="下移" ${index === currentMessages.length - 1 ? 'disabled' : ''}>↓</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeMessage(${index})" title="删除">🗑️</button>
+                        </div>
+                    </div>
+                `).join('')
+    }
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div style="flex: 1;">
+                <input 
+                    type="text" 
+                    id="newMessageInput" 
+                    placeholder="输入新消息内容..."
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                    onkeypress="handleMessageInputKeyPress(event)"
+                >
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="addNewMessage()">➕ 添加消息</button>
+        </div>
+    `;
+}
+
+// 添加新消息
+function addNewMessage() {
+    const input = document.getElementById('newMessageInput');
+    const message = input.value.trim();
+
+    if (!message) {
+        showError('输入错误', '请输入消息内容');
+        return;
+    }
+
+    if (currentMessages.includes(message)) {
+        showWarning('重复消息', '该消息已存在，请输入不同的内容');
+        return;
+    }
+
+    currentMessages.push(message);
+    input.value = '';
+    updateHiddenMessageField();
+    renderMessageList();
+
+    showSuccess('添加成功', `消息 "${message}" 已添加`);
+}
+
+
+// 处理输入框回车事件
+function handleMessageInputKeyPress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addNewMessage();
+    }
+}
+
+// 更新隐藏的消息字段
+function updateHiddenMessageField() {
+    const hiddenField = document.getElementById('editMachineMessage');
+    if (hiddenField) {
+        hiddenField.value = currentMessages.join('----');
+    }
+}
+

@@ -311,10 +311,11 @@
 <!-- 编辑机器模态框 -->
 <div id="dashboardEditMachineModal"
      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001;">
-    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto;">
         <h3>编辑机器配置</h3>
         <form onsubmit="saveEditedMachine(event)">
             <input id="dashboardEditMachineId" type="hidden">
+            <input id="dashboardEditMachineMessage" type="hidden">
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
@@ -323,22 +324,32 @@
                            type="text">
                 </div>
                 <div>
-                    <label>发送的消息:</label>
-                    <input id="dashboardEditMachineMessage" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="text">
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                <div>
                     <label>机器代码:</label>
                     <input id="dashboardEditMachineCode" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
                            type="text">
                 </div>
-                <div>
-                    <label>描述:</label>
-                    <input id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
-                           type="text">
+            </div>
+
+            <div style="margin-bottom: 1rem;">
+                <label>描述:</label>
+                <input id="dashboardEditMachineDesc" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                       type="text">
+            </div>
+
+            <!-- 多消息编辑区域 -->
+            <div style="margin-bottom: 1rem;">
+                <div id="dashboardMessagesContainer">
+                    <!-- 消息列表将通过JavaScript动态生成 -->
+                </div>
+
+                <!-- 消息管理工具栏 -->
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; padding-top: 1rem; border-top: 1px solid #eee;">
+                    <button type="button" class="btn btn-info btn-sm" onclick="showBatchImportModal()">📥 批量导入</button>
+                    <button type="button" class="btn btn-warning btn-sm" onclick="clearAllMessages()">🗑️ 清空全部</button>
+                    <span style="flex: 1;"></span>
+                    <small style="color: #666; align-self: center;">
+                        共 <span id="dashboardMessageCount">${currentMessages.length}</span> 条消息
+                    </small>
                 </div>
             </div>
 
@@ -376,6 +387,8 @@
         </form>
     </div>
 </div>
+
+
 <div id="vmosMachinesModal"
      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1003;">
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 80vh; overflow-y: auto;">

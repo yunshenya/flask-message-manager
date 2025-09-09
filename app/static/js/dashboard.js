@@ -1137,6 +1137,11 @@ function hideMachineManagement() {
 }
 
 function showEditMachineModal() {
+    // 渲染消息列表UI
+    setTimeout(() => {
+        renderMessageList();
+    }, 100);
+
     document.getElementById('dashboardEditMachineModal').style.display = 'block';
 }
 
@@ -2240,3 +2245,248 @@ async function deleteUrlWithRemove(urlId, urlName) {
         }
     }
 }
+
+// 在 app/static/js/dashboard.js 中添加的多消息管理功能
+
+// 修改仪表板的编辑机器函数，支持多消息编辑
+async function editMachine(machineId) {
+    try {
+        const response = await apiCall(`/api/machines/${machineId}`);
+        const machine = response.machine;
+
+        currentEditingMachineId = machineId;
+
+        // 填充基本信息
+        document.getElementById('dashboardEditMachineId').value = machine.id;
+        document.getElementById('dashboardEditMachineName').value = machine.name || '';
+        document.getElementById('dashboardEditMachineCode').value = machine.pade_code || '';
+        document.getElementById('dashboardEditMachineDesc').value = machine.description || '';
+        document.getElementById('dashboardEditSuccessTimeMin').value = machine.success_time[0];
+        document.getElementById('dashboardEditSuccessTimeMax').value = machine.success_time[1];
+        document.getElementById('dashboardEditResetTime').value = machine.reset_time;
+        document.getElementById('dashboardEditMachineIsActive').checked = machine.is_active;
+
+        // 处理消息字段 - 先设置隐藏字段值再解析
+        const messageField = document.getElementById('dashboardEditMachineMessage');
+        messageField.value = machine.message || '';
+
+        // 解析消息为数组
+        const messages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
+        currentMessages = messages;
+
+        showEditMachineModal();
+    } catch (error) {
+        console.error('获取机器信息失败:', error);
+        showError("失败", '获取机器信息失败');
+    }
+}
+
+// 仪表板版本的渲染消息列表函数
+function renderDashboardMessageList() {
+    const container = document.getElementById('dashboardMessagesContainer');
+    if (!container) {
+        // 如果容器不存在，说明是在管理页面，使用管理页面的渲染函数
+        renderMessageList();
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <label style="font-weight: bold; color: #333;">发送的消息列表:</label>
+            <small style="display: block; color: #666; margin-top: 0.25rem;">
+                可以添加多条消息，系统会自动用"----"连接
+            </small>
+        </div>
+        
+        <div id="dashboardMessagesList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; background: #f8f9fa;">
+            ${currentMessages.length === 0 ?
+        '<p style="color: #666; text-align: center; margin: 1rem 0;">暂无消息，请点击下方按钮添加</p>' :
+        currentMessages.map((msg, index) => `
+                    <div class="message-item" style="display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.5rem; background: white; border-radius: 4px; border: 1px solid #e0e0e0;">
+                        <span style="flex: 1; padding-right: 1rem; word-break: break-all;">${msg}</span>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button type="button" class="btn btn-info btn-sm" onclick="editMessage(${index})" title="编辑">✏️</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageUp(${index})" title="上移" ${index === 0 ? 'disabled' : ''}>↑</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageDown(${index})" title="下移" ${index === currentMessages.length - 1 ? 'disabled' : ''}>↓</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeMessage(${index})" title="删除">🗑️</button>
+                        </div>
+                    </div>
+                `).join('')
+    }
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div style="flex: 1;">
+                <input 
+                    type="text" 
+                    id="dashboardNewMessageInput" 
+                    placeholder="输入新消息内容..."
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                    onkeypress="handleDashboardMessageInputKeyPress(event)"
+                >
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="addNewDashboardMessage()">➕ 添加消息</button>
+        </div>
+    `;
+
+    // 更新消息计数
+    const countElement = document.getElementById('dashboardMessageCount');
+    if (countElement) {
+        countElement.textContent = currentMessages.length;
+    }
+}
+
+// 仪表板版本的添加新消息函数
+function addNewDashboardMessage() {
+    const input = document.getElementById('dashboardNewMessageInput') || document.getElementById('newMessageInput');
+    const message = input.value.trim();
+
+    if (!message) {
+        showError('输入错误', '请输入消息内容');
+        return;
+    }
+
+    if (currentMessages.includes(message)) {
+        showWarning('重复消息', '该消息已存在，请输入不同的内容');
+        return;
+    }
+
+    currentMessages.push(message);
+    input.value = '';
+    updateDashboardHiddenMessageField();
+    renderDashboardMessageList();
+
+    showSuccess('添加成功', `消息 "${message}" 已添加`);
+}
+
+// 仪表板版本的处理输入框回车事件
+function handleDashboardMessageInputKeyPress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addNewDashboardMessage();
+    }
+}
+
+// 仪表板版本的更新隐藏消息字段
+function updateDashboardHiddenMessageField() {
+    const hiddenField = document.getElementById('dashboardEditMachineMessage');
+    if (hiddenField) {
+        hiddenField.value = currentMessages.join('----');
+    }
+}
+
+// 通用函数：智能检测当前环境并调用相应的渲染函数
+function renderMessageList() {
+    // 检测当前是在管理页面还是仪表板页面
+    const dashboardContainer = document.getElementById('dashboardMessagesContainer');
+    const adminContainer = document.getElementById('messagesContainer');
+
+    if (dashboardContainer) {
+        renderDashboardMessageList();
+    } else if (adminContainer) {
+        renderAdminMessageList();
+    }
+}
+
+// 管理页面版本的渲染函数
+function renderAdminMessageList() {
+    const container = document.getElementById('messagesContainer');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div style="margin-bottom: 1rem;">
+            <label style="font-weight: bold; color: #333;">发送的消息列表:</label>
+        </div>
+        
+        <div id="messagesList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px; padding: 0.5rem; background: #f8f9fa;">
+            ${currentMessages.length === 0 ?
+        '<p style="color: #666; text-align: center; margin: 1rem 0;">暂无消息，请点击下方按钮添加</p>' :
+        currentMessages.map((msg, index) => `
+                    <div class="message-item" style="display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.5rem; background: white; border-radius: 4px; border: 1px solid #e0e0e0;">
+                        <span style="flex: 1; padding-right: 1rem; word-break: break-all;">${msg}</span>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button type="button" class="btn btn-info btn-sm" onclick="editMessage(${index})" title="编辑">✏️</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageUp(${index})" title="上移" ${index === 0 ? 'disabled' : ''}>↑</button>
+                            <button type="button" class="btn btn-warning btn-sm" onclick="moveMessageDown(${index})" title="下移" ${index === currentMessages.length - 1 ? 'disabled' : ''}>↓</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeMessage(${index})" title="删除">🗑️</button>
+                        </div>
+                    </div>
+                `).join('')
+    }
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div style="flex: 1;">
+                <input 
+                    type="text" 
+                    id="newMessageInput" 
+                    placeholder="输入新消息内容..."
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                    onkeypress="handleMessageInputKeyPress(event)"
+                >
+            </div>
+            <button type="button" class="btn btn-success btn-sm" onclick="addNewMessage()">➕ 添加消息</button>
+        </div>
+    `;
+
+    // 更新消息计数
+    const countElement = document.getElementById('messageCount');
+    if (countElement) {
+        countElement.textContent = currentMessages.length;
+    }
+}
+
+// 通用的添加新消息函数
+function addNewMessage() {
+    // 检测当前环境
+    const dashboardInput = document.getElementById('dashboardNewMessageInput');
+    const adminInput = document.getElementById('newMessageInput');
+
+    if (dashboardInput) {
+        addNewDashboardMessage();
+    } else if (adminInput) {
+        const message = adminInput.value.trim();
+
+        if (!message) {
+            showError('输入错误', '请输入消息内容');
+            return;
+        }
+
+        if (currentMessages.includes(message)) {
+            showWarning('重复消息', '该消息已存在，请输入不同的内容');
+            return;
+        }
+
+        currentMessages.push(message);
+        adminInput.value = '';
+        updateHiddenMessageField();
+        renderMessageList();
+
+        showSuccess('添加成功', `消息 "${message}" 已添加`);
+    }
+}
+
+// 通用的更新隐藏消息字段函数
+function updateHiddenMessageField() {
+    // 检测当前环境并更新相应的隐藏字段
+    const dashboardField = document.getElementById('dashboardEditMachineMessage');
+    const adminField = document.getElementById('editMachineMessage');
+
+    const messageText = currentMessages.join('----');
+
+    if (dashboardField) {
+        dashboardField.value = messageText;
+    }
+    if (adminField) {
+        adminField.value = messageText;
+    }
+}
+
+// 通用的处理输入框回车事件
+function handleMessageInputKeyPress(event) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addNewMessage();
+    }
+}
+
