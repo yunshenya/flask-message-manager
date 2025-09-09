@@ -34,7 +34,7 @@ class UrlData(db.Model):
             'name': self.name,
             'label': self.label or '',
             'duration': self.duration,
-            'Last_time': self.last_time,
+            'Last_time': self.last_time.isoformat(),
             'max_num': self.max_num,
             'current_count': self.current_count,
             'is_active': self.is_active,

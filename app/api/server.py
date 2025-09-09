@@ -180,7 +180,7 @@ def add_execute_num():
                 'url': url.url,
                 'current_count': url.current_count,
                 'remaining': url.max_num - url.current_count,
-                'last_time': url.last_time.isoformat() if url.last_time else None,
+                'last_time': url.last_time.isoformat(),
                 'is_running': url.is_running,
                 'running_duration': url.get_running_duration()
             })
