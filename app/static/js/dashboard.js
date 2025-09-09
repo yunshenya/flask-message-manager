@@ -1821,16 +1821,13 @@ async function showInactiveUrls() {
     }
 
     try {
-        // 先获取完整统计信息
-        const fullStats = await getFullUrlStatistics();
-        console.log('完整统计信息:', fullStats);
+        // 强制重新获取最新数据，不使用缓存
+        const response = await apiCall(`/api/config/${currentConfigId}/urls/inactive?_t=${Date.now()}`);
 
-        const response = await apiCall(`/api/config/${currentConfigId}/urls/inactive`);
-
-        console.log('未激活群聊响应:', response); // 调试日志
+        console.log('显示未激活群聊，获取到:', response); // 调试日志
 
         if (response.urls.length === 0) {
-            showInfo('提示', `当前机器没有未激活的群聊\n统计显示: ${fullStats?.inactive || 0} 个未激活`);
+            showInfo('提示', '当前机器没有未激活的群聊');
             return;
         }
 
@@ -1838,6 +1835,7 @@ async function showInactiveUrls() {
         document.getElementById('inactiveUrlsModal').style.display = 'block';
     } catch (error) {
         console.error('获取未激活群聊失败:', error);
+        showError('获取失败', '无法获取未激活群聊列表');
     }
 }
 
@@ -1845,16 +1843,25 @@ async function showInactiveUrls() {
 function displayInactiveUrls(urls) {
     const listDiv = document.getElementById('inactiveUrlsList');
 
-    listDiv.innerHTML = `
+    // 过滤掉可能已经激活的群聊（双重检查）
+    const actuallyInactiveUrls = urls.filter(url => !url.is_active);
+
+    if (actuallyInactiveUrls.length === 0) {
+        hideInactiveUrlsModal();
+        showInfo('提示', '所有群聊都已激活！');
+        return;
+    }
+
+    const contentHTML = `
         <div style="margin-bottom: 1rem;">
-            <h4>未激活的群聊 (${urls.length} 个)</h4>
+            <h4>未激活的群聊 (${actuallyInactiveUrls.length} 个)</h4>
             <p style="color: #666;">以下群聊当前处于未激活状态，您可以选择激活它们：</p>
         </div>
         
         <div style="max-height: 400px; overflow-y: auto;">
-            ${urls.map(url => {
+            ${actuallyInactiveUrls.map(url => {
         return `
-                    <div style="background: #fff8dc; border: 1px solid #ffc107; border-radius: 4px; padding: 1rem; margin-bottom: 0.5rem; border-left: 4px solid #ffc107;">
+                    <div id="inactive-url-${url.id}" style="background: #fff8dc; border: 1px solid #ffc107; border-radius: 4px; padding: 1rem; margin-bottom: 0.5rem; border-left: 4px solid #ffc107;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                             <div style="flex: 1;">
                                 <div style="font-weight: bold; color: #856404; margin-bottom: 0.5rem;">
@@ -1868,14 +1875,14 @@ function displayInactiveUrls(urls) {
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                <button class="btn btn-success btn-sm" onclick="activateUrl(${url.id}, '${url.name.replace(/'/g, '&#39;')}')" 
+                                <button class="btn btn-success btn-sm" onclick="activateUrlWithRemove(${url.id}, '${url.name.replace(/'/g, '&#39;')}')" 
                                         style="background: linear-gradient(45deg, #28a745, #20c997); border: none; color: white;">
                                     ✅ 激活
                                 </button>
                                 <button class="btn btn-info btn-sm" onclick="editUrl(${url.id}); hideInactiveUrlsModal();">
                                     ✏️ 编辑
                                 </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteUrl(${url.id}, '${url.name.replace(/'/g, '&#39;')}')">
+                                <button class="btn btn-danger btn-sm" onclick="deleteUrlWithRemove(${url.id}, '${url.name.replace(/'/g, '&#39;')}')">
                                     🗑️ 删除
                                 </button>
                             </div>
@@ -1888,10 +1895,12 @@ function displayInactiveUrls(urls) {
         <div style="margin-top: 1rem; text-align: center; border-top: 1px solid #ddd; padding-top: 1rem;">
             <button class="btn btn-success" onclick="batchActivateUrls()" 
                     style="background: linear-gradient(45deg, #28a745, #20c997); border: none;">
-                ⚡ 批量激活所有群聊
+                ⚡ 批量激活所有群聊 (${actuallyInactiveUrls.length})
             </button>
         </div>
     `;
+
+    listDiv.innerHTML = contentHTML;
 }
 
 // 激活单个群聊
@@ -1907,11 +1916,12 @@ async function activateUrl(urlId, urlName) {
 
         showSuccess('激活成功', result.message);
 
-        // 刷新未激活群聊列表
-        await showInactiveUrls();
+        // 关键修复：强制刷新未激活群聊列表
+        await refreshInactiveUrlsList();
 
-        // 刷新主群聊列表
+        // 重新加载主界面数据
         await loadDashboardData();
+
     } catch (error) {
         console.error('激活群聊失败:', error);
     }
@@ -1935,11 +1945,12 @@ async function batchActivateUrls() {
 
         showSuccess('批量激活完成', result.message);
 
-        // 关闭模态框
+        // 关闭未激活群聊窗口
         hideInactiveUrlsModal();
 
-        // 刷新主群聊列表
+        // 重新加载主界面数据
         await loadDashboardData();
+
     } catch (error) {
         console.error('批量激活失败:', error);
     }
@@ -1953,11 +1964,9 @@ function hideInactiveUrlsModal() {
 
 
 function updateUrlStatistics(urlsData) {
-    // 更新或创建统计卡片
     const urlStats = document.getElementById('urlStats');
     if (!urlStats) return;
 
-    // 计算统计数据
     const stats = {
         total: urlsData.total || 0,
         active: urlsData.active || 0,
@@ -1966,7 +1975,6 @@ function updateUrlStatistics(urlsData) {
         running: urlsData.running || 0
     };
 
-    // 重新构建统计卡片
     urlStats.innerHTML = `
         <div class="stat-card">
             <div class="stat-number" style="color: #007bff;">${stats.total}</div>
@@ -1978,7 +1986,7 @@ function updateUrlStatistics(urlsData) {
         </div>
         <div class="stat-card" style="border-left: 4px solid #ffc107;">
             <div class="stat-number" style="color: #f57c00;">${stats.inactive}</div>
-            <div class="stat-label">未激活</div>
+            <div class="stat-label">未激活群聊</div>
         </div>
         <div class="stat-card" style="border-left: 4px solid #17a2b8;">
             <div class="stat-number" style="color: #17a2b8;">${stats.available}</div>
@@ -1990,7 +1998,8 @@ function updateUrlStatistics(urlsData) {
         </div>
     `;
 
-    console.log('URL统计已更新:', stats); // 调试日志
+    // 更新按钮样式
+    setTimeout(updateInactiveUrlsButton, 100);
 }
 
 // 页面加载时的初始化增强
@@ -2072,16 +2081,162 @@ async function getFullUrlStatistics() {
 }
 
 
-async function refreshUrlStatistics() {
-    if (!currentConfigId) return;
+
+function updateInactiveUrlsButton() {
+    const button = document.querySelector('.btn[onclick="showInactiveUrls()"]');
+    if (!button) return;
+
+    // 检查是否有未激活群聊
+    const inactiveCountElement = document.querySelector('#urlStats .stat-card:nth-child(3) .stat-number');
+    const inactiveCount = inactiveCountElement ? parseInt(inactiveCountElement.textContent) : 0;
+
+    if (inactiveCount > 0) {
+        button.classList.add('has-inactive');
+        button.innerHTML = `📋 未激活群聊 <span style="background: rgba(255,255,255,0.3); padding: 0.1rem 0.3rem; border-radius: 10px; font-size: 0.8rem; margin-left: 0.5rem;">${inactiveCount}</span>`;
+    } else {
+        button.classList.remove('has-inactive');
+        button.innerHTML = '📋 未激活群聊';
+    }
+}
+
+// 页面初始化时设置按钮更新
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(updateInactiveUrlsButton, 1000);
+});
+
+
+
+async function refreshInactiveUrlsList() {
+    // 检查未激活群聊窗口是否还开着
+    const modal = document.getElementById('inactiveUrlsModal');
+    if (!modal || modal.style.display === 'none') {
+        return; // 窗口已关闭，无需刷新
+    }
+
+    if (!currentConfigId) {
+        hideInactiveUrlsModal();
+        return;
+    }
 
     try {
-        const fullStats = await getFullUrlStatistics();
-        if (fullStats) {
-            updateUrlStatistics(fullStats);
-            console.log('强制刷新统计完成:', fullStats);
+        const response = await apiCall(`/api/config/${currentConfigId}/urls/inactive`);
+
+        console.log('刷新未激活列表，获取到:', response); // 调试日志
+
+        if (response.urls.length === 0) {
+            // 没有未激活群聊了，关闭窗口
+            hideInactiveUrlsModal();
+            showInfo('提示', '所有群聊都已激活！');
+            return;
         }
+
+        // 更新显示
+        displayInactiveUrls(response.urls);
+
     } catch (error) {
-        console.error('刷新统计失败:', error);
+        console.error('刷新未激活群聊列表失败:', error);
+        // 发生错误时关闭窗口
+        hideInactiveUrlsModal();
+    }
+}
+
+
+
+
+async function activateUrlWithRemove(urlId, urlName) {
+    if (!await showConfirm('确认激活', `确定要激活群聊 "${urlName}" 吗？`, 'primary')) {
+        return;
+    }
+
+    try {
+        // 先从界面移除该项目（立即反馈）
+        const urlElement = document.getElementById(`inactive-url-${urlId}`);
+        if (urlElement) {
+            urlElement.style.opacity = '0.5';
+            urlElement.style.pointerEvents = 'none';
+        }
+
+        const result = await apiCall(`/api/url/${urlId}/activate`, {
+            method: 'POST'
+        });
+
+        // 立即从DOM中移除
+        if (urlElement) {
+            urlElement.remove();
+        }
+
+        showSuccess('激活成功', result.message);
+
+        // 检查是否还有未激活的群聊
+        const remainingItems = document.querySelectorAll('#inactiveUrlsList [id^="inactive-url-"]');
+        if (remainingItems.length === 0) {
+            hideInactiveUrlsModal();
+            showInfo('完成', '所有群聊都已激活！');
+        } else {
+            // 更新标题中的数量
+            const titleElement = document.querySelector('#inactiveUrlsList h4');
+            if (titleElement) {
+                titleElement.textContent = `未激活的群聊 (${remainingItems.length} 个)`;
+            }
+
+            // 更新批量激活按钮
+            const batchBtn = document.querySelector('#inactiveUrlsList .btn[onclick="batchActivateUrls()"]');
+            if (batchBtn) {
+                batchBtn.innerHTML = `⚡ 批量激活所有群聊 (${remainingItems.length})`;
+            }
+        }
+
+        // 后台刷新主界面数据
+        loadDashboardData();
+
+    } catch (error) {
+        console.error('激活群聊失败:', error);
+        // 恢复元素状态
+        if (urlElement) {
+            urlElement.style.opacity = '1';
+            urlElement.style.pointerEvents = 'auto';
+        }
+    }
+}
+
+// 7. 新增：删除并立即从列表移除的函数
+async function deleteUrlWithRemove(urlId, urlName) {
+    if (!await showConfirm('确认删除', `确定要删除群聊 "${urlName}" 吗？此操作不可撤销。`, 'danger')) {
+        return;
+    }
+
+    try {
+        // 先从界面移除该项目
+        const urlElement = document.getElementById(`inactive-url-${urlId}`);
+        if (urlElement) {
+            urlElement.style.opacity = '0.5';
+        }
+
+        await apiCall(`/api/url/${urlId}`, {
+            method: 'DELETE'
+        });
+
+        // 立即从DOM中移除
+        if (urlElement) {
+            urlElement.remove();
+        }
+
+        showSuccess('删除成功', `群聊 "${urlName}" 已删除`);
+
+        // 检查是否还有项目
+        const remainingItems = document.querySelectorAll('#inactiveUrlsList [id^="inactive-url-"]');
+        if (remainingItems.length === 0) {
+            hideInactiveUrlsModal();
+        }
+
+        // 后台刷新主界面数据
+        loadDashboardData();
+
+    } catch (error) {
+        console.error('删除群聊失败:', error);
+        // 恢复元素状态
+        if (urlElement) {
+            urlElement.style.opacity = '1';
+        }
     }
 }

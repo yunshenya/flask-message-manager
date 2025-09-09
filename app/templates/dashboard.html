@@ -81,6 +81,7 @@
             <a class="btn btn-success" href="#" onclick="showAddUrlModal()">添加新群</a>
             <a class="btn btn-primary" href="#" onclick="refreshData()">刷新数据</a>
             <a class="btn btn-warning" href="#" onclick="resetAllUrls()">重置所有计数</a>
+            <a class="btn btn-info" href="#" onclick="showInactiveUrls()">📋 未激活群聊</a>
         </div>
         <div class="action-card">
             <h3>机器控制</h3>
@@ -385,29 +386,6 @@
         <div id="vmosMachinesContent">
             <!-- 内容将通过JavaScript动态加载 -->
         </div>
-    </div>
-</div>
-
-<!-- 在统计卡片区域后添加群聊管理选项 -->
-<div class="card" style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; color: #333;">📋 群聊管理选项</h3>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <!-- 显示选项 -->
-            <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem;">
-                <input type="checkbox" id="showInactiveUrlsCheckbox" onchange="loadDashboardData()">
-                <span>显示未激活群聊</span>
-            </label>
-
-            <!-- 群聊管理按钮 -->
-            <button class="btn btn-warning btn-sm" onclick="showInactiveUrls()">👁️ 查看未激活群聊</button>
-            <button class="btn btn-info btn-sm" onclick="refreshUrlStatistics()">🔄 刷新列表</button>
-        </div>
-    </div>
-
-    <!-- 群聊统计信息 -->
-    <div id="urlStats" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
-        <!-- 统计卡片将在这里动态显示 -->
     </div>
 </div>
 
