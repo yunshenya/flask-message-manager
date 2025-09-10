@@ -1190,16 +1190,30 @@ async function loadMachineManagementList() {
                 </thead>
                 <tbody>
                     ${machines.map(machine => {
-            const message = machine.message || '暂无消息';
-            const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
+            const message = machine.message || null;
+            let messageDisplay;
+            if (message && message.trim() !== '') {
+                const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
+                messageDisplay = `
+            <span style="cursor: pointer; color: #007bff; text-decoration: underline;" 
+                  onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
+                ${displayMessage}
+            </span>
+                        `;
+            } else {
+                messageDisplay = `
+                        <span style="color: #6c757d; font-style: italic;">
+                            暂无消息
+                        </span>
+                    `;
+            }
+
             return `
                         <tr>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                                <span style="cursor: pointer; color: #007bff; text-decoration: underline;" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
-                                    ${displayMessage}
-                                </span>
+                                ${messageDisplay}
                             </td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
                             <td style="padding: 0.5rem; border: 1px solid #ddd;">
