@@ -1321,3 +1321,310 @@ body {
 .import-tooltip:hover::after {
     opacity: 1;
 }
+
+
+/* 批量删除模态框样式 */
+#batchDeleteUrlModal .delete-url-item {
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    margin-bottom: 1px;
+}
+
+#batchDeleteUrlModal .delete-url-item:hover {
+    background: #f8f9fa !important;
+    transform: translateX(2px);
+}
+
+#batchDeleteUrlModal .delete-url-item.selected {
+    background: linear-gradient(90deg, #fff3cd 0%, #ffffff 100%) !important;
+    border-left: 4px solid #ffc107 !important;
+    transform: translateX(4px);
+    box-shadow: 0 2px 4px rgba(255, 193, 7, 0.2);
+}
+
+/* 不同状态的群聊项目样式 */
+.delete-item-inactive {
+    background: linear-gradient(90deg, #f8d7da 0%, #ffffff 100%) !important;
+    border-left: 3px solid #dc3545 !important;
+}
+
+.delete-item-running {
+    background: linear-gradient(90deg, #d4edda 0%, #ffffff 100%) !important;
+    border-left: 3px solid #28a745 !important;
+}
+
+.delete-item-completed {
+    background: linear-gradient(90deg, #e2e3e5 0%, #ffffff 100%) !important;
+    border-left: 3px solid #6c757d !important;
+}
+
+/* 筛选区域样式 */
+#batchDeleteUrlModal .filter-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-left: 4px solid #007bff;
+    transition: transform 0.2s ease;
+}
+
+#batchDeleteUrlModal .filter-section:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 全选控制区域样式 */
+#batchDeleteUrlModal .selection-controls {
+    background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+    border: 1px solid #dee2e6;
+    transition: all 0.2s ease;
+}
+
+#batchDeleteUrlModal .selection-controls:hover {
+    background: linear-gradient(135deg, #e2e6ea 0%, #f1f3f4 100%);
+}
+
+/* 统计信息区域样式 */
+#deleteStatsInfo {
+    animation: slideInStats 0.3s ease-out;
+    border-left: 4px solid #ffc107 !important;
+}
+
+@keyframes slideInStats {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+        max-height: 0;
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+        max-height: 200px;
+    }
+}
+
+/* 删除按钮状态样式 */
+#executeDeleteBtn:disabled {
+    background: #6c757d !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+#executeDeleteBtn:not(:disabled) {
+    background: linear-gradient(45deg, #dc3545, #c82333) !important;
+    transition: all 0.3s ease !important;
+}
+
+#executeDeleteBtn:not(:disabled):hover {
+    background: linear-gradient(45deg, #c82333, #bd2130) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4) !important;
+}
+
+/* 警告区域样式 */
+.danger-warning {
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%) !important;
+    border-left: 4px solid #dc3545 !important;
+    animation: warningPulse 2s infinite;
+}
+
+@keyframes warningPulse {
+    0%, 100% {
+        border-left-color: #dc3545;
+    }
+    50% {
+        border-left-color: #721c24;
+    }
+}
+
+/* 搜索框增强样式 */
+#deleteSearchInput {
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+#deleteSearchInput:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    transform: scale(1.02);
+}
+
+/* 筛选下拉框样式 */
+#deleteFilterStatus, #deleteFilterLabel {
+    transition: all 0.3s ease;
+}
+
+#deleteFilterStatus:focus, #deleteFilterLabel:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* 滚动条样式 */
+#deleteUrlsList::-webkit-scrollbar {
+    width: 8px;
+}
+
+#deleteUrlsList::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+#deleteUrlsList::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+#deleteUrlsList::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 复选框增强样式 */
+#batchDeleteUrlModal input[type="checkbox"] {
+    transition: all 0.2s ease;
+}
+
+#batchDeleteUrlModal input[type="checkbox"]:hover {
+    transform: scale(1.3);
+}
+
+#batchDeleteUrlModal input[type="checkbox"]:checked {
+    accent-color: #ffc107;
+}
+
+/* 预览模态框样式 */
+.preview-modal {
+    animation: fadeInModal 0.3s ease-out;
+}
+
+@keyframes fadeInModal {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.preview-modal > div {
+    animation: slideInModal 0.3s ease-out;
+}
+
+@keyframes slideInModal {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 删除进度指示器 */
+.delete-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    color: #721c24;
+    font-size: 0.9rem;
+    animation: deleteProgress 1.5s infinite;
+}
+
+@keyframes deleteProgress {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.delete-progress .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f5c6cb;
+    border-top: 2px solid #721c24;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 统计网格样式 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    font-size: 0.9rem;
+}
+
+.stats-grid > div {
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.stats-grid > div:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+}
+
+/* 状态徽章样式 */
+.status-badge {
+    padding: 0.1rem 0.3rem !important;
+    border-radius: 3px !important;
+    font-size: 0.7rem !important;
+    font-weight: bold !important;
+    margin-left: 0.5rem !important;
+}
+
+.status-badge.inactive {
+    background: #ffc107 !important;
+    color: #212529 !important;
+}
+
+.status-badge.running {
+    background: #28a745 !important;
+    color: white !important;
+}
+
+.status-badge.completed {
+    background: #6c757d !important;
+    color: white !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    #batchDeleteUrlModal > div {
+        width: 95% !important;
+        padding: 1.5rem !important;
+        max-height: 90vh !important;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+
+    #batchDeleteUrlModal .filter-section > div:first-child {
+        grid-template-columns: 1fr !important;
+    }
+
+    #batchDeleteUrlModal .selection-controls {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 1rem !important;
+    }
+
+    #batchDeleteUrlModal .selection-controls > div:last-child {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    #batchDeleteUrlModal .btn {
+        flex: 1;
+        min-width: 100px;
+    }
+}

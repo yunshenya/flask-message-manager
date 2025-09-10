@@ -2682,3 +2682,475 @@ document.addEventListener('keydown', function(e) {
         showBatchImportUrlModal();
     }
 });
+
+
+// ================================
+// 批量删除群聊功能
+// ================================
+
+let allDeleteUrls = []; // 存储所有可删除的群聊
+let filteredDeleteUrls = []; // 存储筛选后的群聊
+let selectedDeleteUrls = new Set(); // 存储选中的群聊ID
+
+async function showBatchDeleteUrlModal() {
+    if (!currentConfigId) {
+        showError('操作失败', '请先选择一台机器');
+        return;
+    }
+
+    // 重置状态
+    selectedDeleteUrls.clear();
+
+    // 显示模态框
+    document.getElementById('batchDeleteUrlModal').style.display = 'block';
+
+    // 加载群聊数据
+    await loadDeleteUrls();
+}
+
+function hideBatchDeleteUrlModal() {
+    document.getElementById('batchDeleteUrlModal').style.display = 'none';
+    selectedDeleteUrls.clear();
+    allDeleteUrls = [];
+    filteredDeleteUrls = [];
+}
+
+async function loadDeleteUrls() {
+    try {
+        // 加载包含未激活群聊的完整列表
+        const response = await apiCall(`/api/config/${currentConfigId}/urls?include_inactive=true`);
+        allDeleteUrls = response.urls || [];
+
+        // 加载标签列表用于筛选
+        await loadDeleteLabels();
+
+        // 初始化筛选
+        filterDeleteUrls();
+
+    } catch (error) {
+        console.error('加载群聊列表失败:', error);
+        document.getElementById('deleteUrlsList').innerHTML =
+            '<p style="text-align: center; color: #dc3545; padding: 2rem; margin: 0;">加载失败，请重试</p>';
+    }
+}
+
+async function loadDeleteLabels() {
+    try {
+        const response = await apiCall(`/api/urls/labels?config_id=${currentConfigId}`);
+        const labelSelect = document.getElementById('deleteFilterLabel');
+
+        // 清空现有选项（保留默认选项）
+        while (labelSelect.children.length > 2) {
+            labelSelect.removeChild(labelSelect.lastChild);
+        }
+
+        // 添加标签选项
+        response.labels.forEach(labelStat => {
+            const option = document.createElement('option');
+            option.value = labelStat.label;
+            option.textContent = `${labelStat.label} (${labelStat.total})`;
+            labelSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('加载标签列表失败:', error);
+    }
+}
+
+function filterDeleteUrls() {
+    const statusFilter = document.getElementById('deleteFilterStatus').value;
+    const labelFilter = document.getElementById('deleteFilterLabel').value;
+    const searchText = document.getElementById('deleteSearchInput').value.toLowerCase().trim();
+
+    filteredDeleteUrls = allDeleteUrls.filter(url => {
+        // 状态筛选
+        let statusMatch = true;
+        switch (statusFilter) {
+            case 'active':
+                statusMatch = url.is_active;
+                break;
+            case 'inactive':
+                statusMatch = !url.is_active;
+                break;
+            case 'completed':
+                statusMatch = url.current_count >= url.max_num;
+                break;
+            case 'running':
+                statusMatch = url.is_running;
+                break;
+        }
+
+        // 标签筛选
+        let labelMatch = true;
+        if (labelFilter !== 'all') {
+            if (labelFilter === 'no-label') {
+                labelMatch = !url.label || url.label.trim() === '';
+            } else {
+                labelMatch = url.label === labelFilter;
+            }
+        }
+
+        // 搜索筛选
+        let searchMatch = true;
+        if (searchText) {
+            searchMatch = url.name.toLowerCase().includes(searchText) ||
+                url.url.toLowerCase().includes(searchText);
+        }
+
+        return statusMatch && labelMatch && searchMatch;
+    });
+
+    // 更新显示
+    displayDeleteUrls();
+    updateDeleteStats();
+}
+
+function displayDeleteUrls() {
+    const listDiv = document.getElementById('deleteUrlsList');
+
+    if (filteredDeleteUrls.length === 0) {
+        listDiv.innerHTML = '<p style="text-align: center; color: #666; padding: 2rem; margin: 0;">没有找到符合条件的群聊</p>';
+        return;
+    }
+
+    let html = '';
+    filteredDeleteUrls.forEach(url => {
+        const isSelected = selectedDeleteUrls.has(url.id);
+        const hasLabel = url.label && url.label.trim();
+        const isInactive = !url.is_active;
+        const isCompleted = url.current_count >= url.max_num;
+        const isRunning = url.is_running;
+
+        // 确定状态样式
+        let statusBadge = '';
+        let rowClass = '';
+
+        if (isInactive) {
+            statusBadge = '<span style="background: #ffc107; color: #212529; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">未激活</span>';
+            rowClass = 'delete-item-inactive';
+        } else if (isRunning) {
+            statusBadge = '<span style="background: #28a745; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">运行中</span>';
+            rowClass = 'delete-item-running';
+        } else if (isCompleted) {
+            statusBadge = '<span style="background: #6c757d; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">已完成</span>';
+            rowClass = 'delete-item-completed';
+        }
+
+        html += `
+            <div class="delete-url-item ${rowClass} ${isSelected ? 'selected' : ''}" data-url-id="${url.id}">
+                <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid #eee;">
+                    <label style="display: flex; align-items: center; gap: 0.75rem; flex: 1; margin: 0; cursor: pointer;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="toggleDeleteUrlSelection(${url.id})" 
+                               style="transform: scale(1.2);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; margin-bottom: 0.25rem; display: flex; align-items: center;">
+                                ${url.name}
+                                ${hasLabel ? `<span style="background: #17a2b8; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">${url.label}</span>` : ''}
+                                ${statusBadge}
+                            </div>
+                            <div style="color: #666; font-size: 0.9rem; margin-bottom: 0.25rem;">${url.url}</div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                执行次数: ${url.current_count}/${url.max_num} | 
+                                持续: ${url.duration}秒 | 
+                                ${url.Last_time ? '最后执行: ' + new Date(url.Last_time).toLocaleString() : '从未执行'}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        `;
+    });
+
+    listDiv.innerHTML = html;
+}
+
+function toggleDeleteUrlSelection(urlId) {
+    if (selectedDeleteUrls.has(urlId)) {
+        selectedDeleteUrls.delete(urlId);
+    } else {
+        selectedDeleteUrls.add(urlId);
+    }
+
+    updateDeleteSelectionUI();
+    updateDeleteStats();
+}
+
+function toggleSelectAllDeleteUrls() {
+    const selectAllCheckbox = document.getElementById('selectAllDeleteUrls');
+    const isChecked = selectAllCheckbox.checked;
+
+    if (isChecked) {
+        // 全选当前筛选结果
+        filteredDeleteUrls.forEach(url => selectedDeleteUrls.add(url.id));
+    } else {
+        // 取消全选当前筛选结果
+        filteredDeleteUrls.forEach(url => selectedDeleteUrls.delete(url.id));
+    }
+
+    updateDeleteSelectionUI();
+    updateDeleteStats();
+}
+
+function invertSelectionDeleteUrls() {
+    const newSelection = new Set();
+
+    filteredDeleteUrls.forEach(url => {
+        if (!selectedDeleteUrls.has(url.id)) {
+            newSelection.add(url.id);
+        }
+    });
+
+    // 保留不在当前筛选结果中的选择
+    selectedDeleteUrls.forEach(urlId => {
+        const isInFiltered = filteredDeleteUrls.some(url => url.id === urlId);
+        if (!isInFiltered) {
+            newSelection.add(urlId);
+        }
+    });
+
+    selectedDeleteUrls = newSelection;
+    updateDeleteSelectionUI();
+    updateDeleteStats();
+}
+
+function selectByFilterDeleteUrls() {
+    filteredDeleteUrls.forEach(url => selectedDeleteUrls.add(url.id));
+    updateDeleteSelectionUI();
+    updateDeleteStats();
+}
+
+function updateDeleteSelectionUI() {
+    // 更新复选框状态
+    const checkboxes = document.querySelectorAll('#deleteUrlsList input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        const urlId = parseInt(checkbox.getAttribute('onchange').match(/\d+/)[0]);
+        checkbox.checked = selectedDeleteUrls.has(urlId);
+
+        // 更新行样式
+        const row = checkbox.closest('.delete-url-item');
+        if (checkbox.checked) {
+            row.classList.add('selected');
+        } else {
+            row.classList.remove('selected');
+        }
+    });
+
+    // 更新全选复选框状态
+    const selectAllCheckbox = document.getElementById('selectAllDeleteUrls');
+    const filteredIds = filteredDeleteUrls.map(url => url.id);
+    const selectedFilteredCount = filteredIds.filter(id => selectedDeleteUrls.has(id)).length;
+
+    if (selectedFilteredCount === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+    } else if (selectedFilteredCount === filteredIds.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+    } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+    }
+
+    // 更新计数显示
+    document.getElementById('selectedDeleteCount').textContent = `已选择: ${selectedDeleteUrls.size} 个`;
+    document.getElementById('deleteButtonCount').textContent = selectedDeleteUrls.size;
+
+    // 更新删除按钮状态
+    const deleteBtn = document.getElementById('executeDeleteBtn');
+    deleteBtn.disabled = selectedDeleteUrls.size === 0;
+}
+
+function updateDeleteStats() {
+    const selectedUrls = allDeleteUrls.filter(url => selectedDeleteUrls.has(url.id));
+
+    if (selectedUrls.length === 0) {
+        document.getElementById('deleteStatsInfo').style.display = 'none';
+        return;
+    }
+
+    // 统计信息
+    const stats = {
+        total: selectedUrls.length,
+        active: selectedUrls.filter(url => url.is_active).length,
+        inactive: selectedUrls.filter(url => !url.is_active).length,
+        running: selectedUrls.filter(url => url.is_running).length,
+        completed: selectedUrls.filter(url => url.current_count >= url.max_num).length,
+        withLabel: selectedUrls.filter(url => url.label && url.label.trim()).length,
+        totalExecutions: selectedUrls.reduce((sum, url) => sum + url.current_count, 0)
+    };
+
+    const statsHtml = `
+        <h5 style="margin: 0 0 0.5rem 0;">📊 删除统计预览</h5>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; font-size: 0.9rem;">
+            <div><strong>总计:</strong> ${stats.total} 个</div>
+            <div><strong>激活:</strong> ${stats.active} 个</div>
+            <div><strong>未激活:</strong> ${stats.inactive} 个</div>
+            <div><strong>运行中:</strong> ${stats.running} 个</div>
+            <div><strong>已完成:</strong> ${stats.completed} 个</div>
+            <div><strong>有标签:</strong> ${stats.withLabel} 个</div>
+        </div>
+        <div style="margin-top: 0.5rem; font-size: 0.9rem;">
+            <strong>总执行次数:</strong> ${stats.totalExecutions} 次
+        </div>
+    `;
+
+    document.getElementById('deleteStatsContent').innerHTML = statsHtml;
+    document.getElementById('deleteStatsInfo').style.display = 'block';
+}
+
+function previewBatchDelete() {
+    if (selectedDeleteUrls.size === 0) {
+        showError('预览失败', '请先选择要删除的群聊');
+        return;
+    }
+
+    const selectedUrls = allDeleteUrls.filter(url => selectedDeleteUrls.has(url.id));
+
+    let previewHtml = `
+        <div style="max-height: 300px; overflow-y: auto;">
+            <h4 style="color: #dc3545; margin-bottom: 1rem;">即将删除以下 ${selectedUrls.length} 个群聊：</h4>
+    `;
+
+    selectedUrls.forEach((url, index) => {
+        const hasLabel = url.label && url.label.trim();
+        const statusText = url.is_active ?
+            (url.is_running ? '运行中' : (url.current_count >= url.max_num ? '已完成' : '等待中')) :
+            '未激活';
+
+        previewHtml += `
+            <div style="padding: 0.5rem; border-bottom: 1px solid #eee; background: ${index % 2 === 0 ? '#f8f9fa' : 'white'};">
+                <div style="font-weight: bold; color: #dc3545;">${index + 1}. ${url.name}</div>
+                <div style="font-size: 0.9rem; color: #666;">URL: ${url.url}</div>
+                <div style="font-size: 0.8rem; color: #666;">
+                    状态: ${statusText} | 执行: ${url.current_count}/${url.max_num}
+                    ${hasLabel ? ` | 标签: ${url.label}` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    previewHtml += '</div>';
+
+    // 创建预览模态框
+    const previewModal = document.createElement('div');
+    previewModal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(0,0,0,0.7); z-index: 2000; display: flex; 
+        align-items: center; justify-content: center;
+    `;
+
+    previewModal.innerHTML = `
+        <div style="background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0; color: #dc3545;">🗑️ 删除预览</h3>
+                <button onclick="this.closest('.preview-modal').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            ${previewHtml}
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+                <button onclick="this.closest('.preview-modal').remove()" class="btn btn-secondary" style="margin-right: 1rem;">关闭预览</button>
+                <button onclick="this.closest('.preview-modal').remove(); executeBatchDelete();" class="btn btn-danger">确认删除</button>
+            </div>
+        </div>
+    `;
+
+    previewModal.className = 'preview-modal';
+    document.body.appendChild(previewModal);
+}
+
+async function executeBatchDelete() {
+    if (selectedDeleteUrls.size === 0) {
+        showError('删除失败', '请先选择要删除的群聊');
+        return;
+    }
+
+    const selectedUrls = allDeleteUrls.filter(url => selectedDeleteUrls.has(url.id));
+
+    // 最终确认
+    if (!await showConfirm(
+        '确认删除',
+        `确定要删除选中的 ${selectedUrls.length} 个群聊吗？\n\n⚠️ 此操作不可撤销，将永久删除所有相关数据！`,
+        'danger'
+    )) {
+        return;
+    }
+
+    // 开始批量删除
+    let successCount = 0;
+    let failureCount = 0;
+    const results = [];
+
+    // 显示进度
+    const progressInfo = showInfo('批量删除', `正在删除群聊... (0/${selectedUrls.length})`);
+
+    try {
+        for (let i = 0; i < selectedUrls.length; i++) {
+            const url = selectedUrls[i];
+
+            try {
+                await apiCall(`/api/url/${url.id}`, {
+                    method: 'DELETE'
+                });
+
+                successCount++;
+                results.push({
+                    ...url,
+                    status: 'success',
+                    message: '删除成功'
+                });
+
+            } catch (error) {
+                failureCount++;
+                results.push({
+                    ...url,
+                    status: 'error',
+                    message: error.message || '删除失败'
+                });
+            }
+
+            // 更新进度
+            if (progressInfo && progressInfo.parentNode) {
+                const messageElement = progressInfo.querySelector('.notification-message');
+                if (messageElement) {
+                    messageElement.textContent = `正在删除群聊... (${i + 1}/${selectedUrls.length})`;
+                }
+            }
+        }
+
+    } finally {
+        // 移除进度通知
+        if (progressInfo && progressInfo.parentNode) {
+            window.notificationSystem.hideNotification(progressInfo);
+        }
+    }
+
+    // 显示结果
+    const resultMessage = `批量删除完成！\n成功: ${successCount} 个\n失败: ${failureCount} 个`;
+
+    if (failureCount === 0) {
+        showSuccess('删除完成', resultMessage);
+    } else {
+        showWarning('删除完成', resultMessage);
+
+        // 显示详细的失败信息
+        const failedItems = results.filter(r => r.status === 'error');
+        if (failedItems.length > 0) {
+            console.log('删除失败的群聊:', failedItems);
+        }
+    }
+
+    // 关闭模态框
+    hideBatchDeleteUrlModal();
+
+    // 刷新数据
+    await loadDashboardData();
+}
+
+// 键盘快捷键支持
+document.addEventListener('keydown', function(e) {
+    // Ctrl + Shift + D: 批量删除群聊
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        showBatchDeleteUrlModal().then(r => {});
+    }
+});

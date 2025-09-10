@@ -80,6 +80,7 @@
             <h3>群聊管理</h3>
             <a class="btn btn-success" href="#" onclick="showAddUrlModal()">添加新群</a>
             <a class="btn btn-info" href="#" onclick="showBatchImportUrlModal()">📥 批量导入群聊</a>
+            <a class="btn btn-danger" href="#" onclick="showBatchDeleteUrlModal()">🗑️ 批量删除群聊</a>
             <a class="btn btn-primary" href="#" onclick="refreshData()">刷新数据</a>
             <a class="btn btn-warning" href="#" onclick="resetAllUrls()">重置所有计数</a>
             <a class="btn btn-info" href="#" onclick="showInactiveUrls()">📋 未激活群聊</a>
@@ -517,6 +518,94 @@
                 <button type="submit" class="btn btn-success">📥 开始导入</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- 批量删除群聊模态框 -->
+<div id="batchDeleteUrlModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1025;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0; color: #dc3545;">🗑️ 批量删除群聊</h3>
+            <button class="btn btn-secondary btn-sm" onclick="hideBatchDeleteUrlModal()">✕ 关闭</button>
+        </div>
+
+        <!-- 警告提示 -->
+        <div style="background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #721c24;">⚠️ 危险操作警告</h4>
+            <ul style="margin: 0.5rem 0 0 1rem; font-size: 0.9rem;">
+                <li><strong>此操作不可撤销</strong> - 删除的群聊无法恢复</li>
+                <li><strong>数据永久丢失</strong> - 包括执行历史、标签、状态等所有相关数据</li>
+                <li><strong>请谨慎操作</strong> - 建议先备份重要数据</li>
+            </ul>
+        </div>
+
+        <!-- 筛选和搜索区域 -->
+        <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
+            <h5 style="margin: 0 0 1rem 0;">🔍 筛选选项</h5>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">按状态筛选:</label>
+                    <select id="deleteFilterStatus" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="all">全部群聊</option>
+                        <option value="active">仅激活的群聊</option>
+                        <option value="inactive">仅未激活的群聊</option>
+                        <option value="completed">已完成的群聊</option>
+                        <option value="running">正在运行的群聊</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">按标签筛选:</label>
+                    <select id="deleteFilterLabel" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="all">全部标签</option>
+                        <option value="no-label">无标签</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">搜索群聊:</label>
+                <input type="text" id="deleteSearchInput" placeholder="搜索群聊名称或URL..."
+                       oninput="filterDeleteUrls()"
+                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+
+        <!-- 全选和操作按钮 -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 0.75rem; background: #e9ecef; border-radius: 4px;">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: bold; margin: 0;">
+                    <input type="checkbox" id="selectAllDeleteUrls" onchange="toggleSelectAllDeleteUrls()" style="transform: scale(1.2);">
+                    <span>全选/取消全选</span>
+                </label>
+                <span id="selectedDeleteCount" style="color: #495057; font-size: 0.9rem;">已选择: 0 个</span>
+            </div>
+            <div>
+                <button class="btn btn-warning btn-sm" onclick="invertSelectionDeleteUrls()">🔄 反选</button>
+                <button class="btn btn-info btn-sm" onclick="selectByFilterDeleteUrls()">✅ 选择筛选结果</button>
+            </div>
+        </div>
+
+        <!-- 群聊列表 -->
+        <div style="border: 1px solid #dee2e6; border-radius: 4px; max-height: 400px; overflow-y: auto;">
+            <div id="deleteUrlsList" style="padding: 0.5rem;">
+                <!-- 群聊列表将通过JavaScript动态加载 -->
+                <p style="text-align: center; color: #666; padding: 2rem; margin: 0;">加载中...</p>
+            </div>
+        </div>
+
+        <!-- 删除统计信息 -->
+        <div id="deleteStatsInfo" style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; border-radius: 4px; padding: 1rem; margin: 1rem 0; display: none;">
+            <div id="deleteStatsContent"></div>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+            <button type="button" class="btn btn-secondary" onclick="hideBatchDeleteUrlModal()" style="margin-right: 1rem;">取消</button>
+            <button type="button" class="btn btn-warning" onclick="previewBatchDelete()" style="margin-right: 1rem;">👁️ 预览删除</button>
+            <button type="button" class="btn btn-danger" onclick="executeBatchDelete()" id="executeDeleteBtn" disabled>
+                🗑️ 删除选中的群聊 (<span id="deleteButtonCount">0</span>)
+            </button>
+        </div>
     </div>
 </div>
 </body>
