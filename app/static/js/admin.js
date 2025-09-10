@@ -658,7 +658,7 @@ async function exportToEnvFile() {
 async function backupAndUpdateEnv() {
     if (!await showConfirm('确认更新',
         '确定要备份当前.env文件并用数据库配置更新吗？\n' +
-        '这将覆盖现有的.env文件，建议先导出备份。', 'warning')) {
+        '这将覆盖现有的.env文件，建议先导出备份。', 'primary')) {
         return;
     }
 
@@ -698,6 +698,7 @@ async function loadSystemConfigs() {
         const response = await apiCall('/api/system-configs');
         systemConfigs = response.configs;
         displaySystemConfigs(response.configs, response.categories);
+        showSuccess("成功", "刷新成功")
     } catch (error) {
         document.getElementById('systemConfigsTable').innerHTML = '<p>加载系统配置失败</p>';
     }
