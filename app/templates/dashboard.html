@@ -79,6 +79,7 @@
         <div class="action-card">
             <h3>群聊管理</h3>
             <a class="btn btn-success" href="#" onclick="showAddUrlModal()">添加新群</a>
+            <a class="btn btn-info" href="#" onclick="showBatchImportUrlModal()">📥 批量导入群聊</a>
             <a class="btn btn-primary" href="#" onclick="refreshData()">刷新数据</a>
             <a class="btn btn-warning" href="#" onclick="resetAllUrls()">重置所有计数</a>
             <a class="btn btn-info" href="#" onclick="showInactiveUrls()">📋 未激活群聊</a>
@@ -447,5 +448,76 @@
     </div>
 </div>
 
+<!-- 批量导入群聊模态框 -->
+<div id="batchImportUrlModal"
+     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1020;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 8px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="margin: 0;">📥 批量导入群聊</h3>
+            <button class="btn btn-secondary btn-sm" onclick="hideBatchImportUrlModal()">✕ 关闭</button>
+        </div>
+
+        <!-- 导入格式说明 -->
+        <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
+            <h4 style="margin: 0 0 0.5rem 0; color: #1976d2;">📋 导入格式说明</h4>
+            <div style="color: #1976d2; font-size: 0.9rem;">
+                <p style="margin: 0.5rem 0;">支持以下格式（每行一个群聊）：</p>
+                <ul style="margin: 0.5rem 0 0 1rem;">
+                    <li><strong>URL和名称：</strong> https://t.me/groupname | 群聊名称</li>
+                    <li><strong>只有URL：</strong> https://t.me/groupname （自动使用URL作为名称）</li>
+                    <li><strong>只有名称：</strong> 群聊名称 （需要手动设置URL）</li>
+                </ul>
+                <p style="margin: 0.5rem 0 0 0; font-weight: bold;">分隔符：使用 | 或 ---- 分隔URL和名称</p>
+            </div>
+        </div>
+
+        <form onsubmit="processBatchImportUrls(event)">
+            <div style="margin-bottom: 1rem;">
+                <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">群聊列表:</label>
+                <textarea
+                        id="batchUrlsInput"
+                        rows="12"
+                        placeholder="请输入群聊信息，例如：&#10;https://t.me/group1 | 第一个群聊&#10;https://t.me/group2 | 第二个群聊&#10;或者每行一个群聊名称"
+                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; resize: vertical; line-height: 1.4;"
+                ></textarea>
+                <small style="color: #666; margin-top: 0.5rem; display: block;">
+                    💡 提示：可以直接粘贴群聊链接列表，系统会自动解析
+                </small>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                <div>
+                    <label style="font-weight: bold;">默认持续时间(秒):</label>
+                    <input id="batchDuration" type="number" min="1" value="30"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                </div>
+                <div>
+                    <label style="font-weight: bold;">默认最大执行次数:</label>
+                    <input id="batchMaxNum" type="number" min="1" value="3"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input id="batchIsActive" type="checkbox" checked style="transform: scale(1.2);">
+                    <span style="font-weight: bold;">✅ 默认激活所有导入的群聊</span>
+                </label>
+            </div>
+
+            <!-- 预览区域 -->
+            <div id="importPreview" style="display: none; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 1rem; margin-bottom: 1rem; max-height: 200px; overflow-y: auto;">
+                <h5 style="margin: 0 0 0.5rem 0; color: #495057;">📋 导入预览：</h5>
+                <div id="previewContent" style="font-size: 0.9rem;"></div>
+            </div>
+
+            <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1rem;">
+                <button type="button" class="btn btn-info" onclick="previewBatchImport()" style="margin-right: 1rem;">👁️ 预览</button>
+                <button type="button" class="btn btn-secondary" onclick="hideBatchImportUrlModal()" style="margin-right: 1rem;">取消</button>
+                <button type="submit" class="btn btn-success">📥 开始导入</button>
+            </div>
+        </form>
+    </div>
+</div>
 </body>
 </html>

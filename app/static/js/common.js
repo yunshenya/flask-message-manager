@@ -231,13 +231,225 @@ function clearAllMessages() {
 
 function editMessage(index) {
     const currentMsg = currentMessages[index];
-    const newMsg = prompt('编辑消息:', currentMsg);
+    showEditMessageModal(index, currentMsg);
+}
 
-    if (newMsg === null) return; // 用户取消
+// 显示编辑消息的模态框
+function showEditMessageModal(index, currentMessage) {
+    // 创建模态框HTML
+    const modalHTML = `
+        <div id="editMessageModal" style="
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(0,0,0,0.6); 
+            z-index: 2000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            backdrop-filter: blur(2px);
+        ">
+            <div style="
+                background: white; 
+                padding: 2rem; 
+                border-radius: 12px; 
+                width: 90%; 
+                max-width: 500px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                animation: modalSlideIn 0.3s ease-out;
+            ">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                        ✏️ 编辑消息
+                    </h3>
+                    <button onclick="closeEditMessageModal()" style="
+                        background: none; 
+                        border: none; 
+                        font-size: 1.5rem; 
+                        cursor: pointer; 
+                        color: #999;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='#f0f0f0'; this.style.color='#666';" 
+                       onmouseout="this.style.background='none'; this.style.color='#999';">×</button>
+                </div>
+                
+                <div style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #555;">
+                        消息内容:
+                    </label>
+                    <textarea 
+                        id="editMessageInput" 
+                        style="
+                            width: 100%; 
+                            min-height: 120px; 
+                            padding: 1rem; 
+                            border: 2px solid #e1e5e9; 
+                            border-radius: 8px; 
+                            font-size: 1rem;
+                            line-height: 1.5;
+                            resize: vertical;
+                            font-family: inherit;
+                            transition: border-color 0.3s ease;
+                            box-sizing: border-box;
+                        "
+                        placeholder="请输入消息内容..."
+                        onfocus="this.style.borderColor='#007bff'; this.style.outline='none';"
+                        onblur="this.style.borderColor='#e1e5e9';"
+                    >${currentMessage}</textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <small style="color: #666;">提示: 支持多行文本，按Ctrl+Enter快速保存</small>
+                        <span id="charCount" style="color: #999; font-size: 0.85rem;">${currentMessage.length} 字符</span>
+                    </div>
+                </div>
 
-    const trimmedMsg = newMsg.trim();
+                <div style="
+                    display: flex; 
+                    gap: 1rem; 
+                    justify-content: flex-end;
+                    padding-top: 1rem;
+                    border-top: 1px solid #eee;
+                ">
+                    <button onclick="closeEditMessageModal()" style="
+                        padding: 0.75rem 1.5rem; 
+                        border: 2px solid #6c757d; 
+                        background: white; 
+                        color: #6c757d; 
+                        border-radius: 8px; 
+                        cursor: pointer;
+                        font-weight: 500;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.background='#6c757d'; this.style.color='white';"
+                       onmouseout="this.style.background='white'; this.style.color='#6c757d';">
+                        取消
+                    </button>
+                    <button onclick="saveEditedMessage(${index})" style="
+                        padding: 0.75rem 1.5rem; 
+                        border: 2px solid #28a745; 
+                        background: #28a745; 
+                        color: white; 
+                        border-radius: 8px; 
+                        cursor: pointer;
+                        font-weight: 500;
+                        transition: all 0.3s ease;
+                    " onmouseover="this.style.background='#218838'; this.style.borderColor='#218838';"
+                       onmouseout="this.style.background='#28a745'; this.style.borderColor='#28a745';">
+                        💾 保存修改
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <style>
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        </style>
+    `;
+
+    // 移除已存在的模态框
+    const existingModal = document.getElementById('editMessageModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // 添加到页面
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // 聚焦到输入框并选中所有文本
+    setTimeout(() => {
+        const input = document.getElementById('editMessageInput');
+        if (input) {
+            input.focus();
+            input.select();
+
+            // 添加字符计数功能
+            const updateCharCount = () => {
+                const charCount = document.getElementById('charCount');
+                if (charCount) {
+                    const length = input.value.length;
+                    charCount.textContent = `${length} 字符`;
+
+                    // 根据长度变色
+                    if (length > 200) {
+                        charCount.style.color = '#dc3545';
+                    } else if (length > 100) {
+                        charCount.style.color = '#ffc107';
+                    } else {
+                        charCount.style.color = '#999';
+                    }
+                }
+            };
+
+            input.addEventListener('input', updateCharCount);
+
+            // 添加快捷键支持
+            input.addEventListener('keydown', (e) => {
+                // Ctrl+Enter 快速保存
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    saveEditedMessage(index);
+                }
+                // Escape 取消
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeEditMessageModal();
+                }
+            });
+        }
+    }, 100);
+
+    // 点击背景关闭
+    document.getElementById('editMessageModal').addEventListener('click', (e) => {
+        if (e.target.id === 'editMessageModal') {
+            closeEditMessageModal();
+        }
+    });
+}
+
+// 关闭编辑模态框
+function closeEditMessageModal() {
+    const modal = document.getElementById('editMessageModal');
+    if (modal) {
+        // 添加淡出动画
+        modal.style.animation = 'modalSlideOut 0.2s ease-in forwards';
+        setTimeout(() => {
+            modal.remove();
+        }, 200);
+    }
+}
+
+// 保存编辑后的消息
+function saveEditedMessage(index) {
+    const input = document.getElementById('editMessageInput');
+    if (!input) return;
+
+    const trimmedMsg = input.value.trim();
+
+    // 验证输入
     if (!trimmedMsg) {
         showError('输入错误', '消息内容不能为空');
+        input.focus();
+        return;
+    }
+
+    if (trimmedMsg.length > 500) {
+        showError('输入错误', '消息内容不能超过500个字符');
+        input.focus();
         return;
     }
 
@@ -245,15 +457,42 @@ function editMessage(index) {
     const otherMessages = currentMessages.filter((_, i) => i !== index);
     if (otherMessages.includes(trimmedMsg)) {
         showWarning('重复消息', '该消息已存在，请输入不同的内容');
+        input.focus();
+        input.select();
         return;
     }
 
+    // 检查是否有实际修改
+    if (trimmedMsg === currentMessages[index]) {
+        showInfo('提示', '消息内容没有变化');
+        closeEditMessageModal();
+        return;
+    }
+
+    // 保存修改
     currentMessages[index] = trimmedMsg;
     updateHiddenMessageField();
     renderMessageList();
+    closeEditMessageModal();
 
-    showSuccess('编辑成功', '消息已更新');
+    showSuccess('编辑成功', `消息已更新为: "${trimmedMsg.length > 20 ? trimmedMsg.substring(0, 20) + '...' : trimmedMsg}"`);
 }
+
+// 添加淡出动画样式
+const fadeOutStyle = document.createElement('style');
+fadeOutStyle.textContent = `
+@keyframes modalSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+}
+`;
+document.head.appendChild(fadeOutStyle);
 
 
 function removeMessage(index) {

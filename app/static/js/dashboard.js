@@ -2408,3 +2408,277 @@ function handleMessageInputKeyPress(event) {
     }
 }
 
+
+// ================================
+// 批量导入群聊功能
+// ================================
+
+function showBatchImportUrlModal() {
+    if (!currentConfigId) {
+        showError('操作失败', '请先选择一台机器');
+        return;
+    }
+
+    // 清空表单
+    document.getElementById('batchUrlsInput').value = '';
+    document.getElementById('batchDuration').value = '30';
+    document.getElementById('batchMaxNum').value = '3';
+    document.getElementById('batchIsActive').checked = true;
+
+    // 隐藏预览
+    document.getElementById('importPreview').style.display = 'none';
+
+    document.getElementById('batchImportUrlModal').style.display = 'block';
+}
+
+function hideBatchImportUrlModal() {
+    document.getElementById('batchImportUrlModal').style.display = 'none';
+}
+
+function previewBatchImport() {
+    const input = document.getElementById('batchUrlsInput').value.trim();
+    if (!input) {
+        showError('输入错误', '请输入群聊信息');
+        return;
+    }
+
+    const parsedUrls = parseBatchUrlInput(input);
+
+    if (parsedUrls.length === 0) {
+        showError('解析错误', '无法解析群聊信息，请检查格式');
+        return;
+    }
+
+    displayImportPreview(parsedUrls);
+}
+
+function parseBatchUrlInput(input) {
+    const lines = input.split('\n').map(line => line.trim()).filter(line => line);
+    const results = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        let url = '';
+        let name = '';
+
+        // 检查是否包含分隔符
+        if (line.includes('|')) {
+            const parts = line.split('|').map(part => part.trim());
+            url = parts[0] || '';
+            name = parts[1] || parts[0] || `群聊_${i + 1}`;
+        } else if (line.includes('----')) {
+            const parts = line.split('----').map(part => part.trim());
+            url = parts[0] || '';
+            name = parts[1] || parts[0] || `群聊_${i + 1}`;
+        } else {
+            // 没有分隔符，判断是URL还是名称
+            if (line.startsWith('http') || line.startsWith('@') || line.includes('t.me')) {
+                url = line;
+                name = extractNameFromUrl(line) || `群聊_${i + 1}`;
+            } else {
+                // 当作名称处理
+                url = line;
+                name = line;
+            }
+        }
+
+        if (url || name) {
+            results.push({
+                url: url,
+                name: name,
+                originalLine: line,
+                lineNumber: i + 1
+            });
+        }
+    }
+
+    return results;
+}
+
+function extractNameFromUrl(url) {
+    try {
+        // 从 t.me 链接提取群组名
+        if (url.includes('t.me/')) {
+            const match = url.match(/t\.me\/([^/?]+)/);
+            if (match) {
+                return '@' + match[1];
+            }
+        }
+
+        // 如果是 @ 开头的用户名
+        if (url.startsWith('@')) {
+            return url;
+        }
+
+        return null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function displayImportPreview(parsedUrls) {
+    const previewDiv = document.getElementById('importPreview');
+    const contentDiv = document.getElementById('previewContent');
+
+    let html = `<div style="margin-bottom: 0.5rem;"><strong>共解析到 ${parsedUrls.length} 个群聊：</strong></div>`;
+
+    parsedUrls.forEach((item, index) => {
+        const hasIssue = !item.url || !item.name;
+        const issueClass = hasIssue ? 'style="color: #dc3545; background: #f8d7da; padding: 0.25rem; border-radius: 3px;"' : '';
+
+        html += `
+            <div ${issueClass} style="padding: 0.25rem 0; border-bottom: 1px solid #eee; font-family: monospace;">
+                <strong>${index + 1}.</strong> 
+                URL: <span style="color: #007bff;">${item.url || '❌ 缺失'}</span> | 
+                名称: <span style="color: #28a745;">${item.name || '❌ 缺失'}</span>
+                ${hasIssue ? '<span style="color: #dc3545; font-weight: bold;"> ⚠️ 需要修正</span>' : ''}
+            </div>
+        `;
+    });
+
+    contentDiv.innerHTML = html;
+    previewDiv.style.display = 'block';
+
+    // 滚动到预览区域
+    previewDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function processBatchImportUrls(event) {
+    event.preventDefault();
+
+    if (!currentConfigId) {
+        showError('操作失败', '请先选择一台机器');
+        return;
+    }
+
+    const input = document.getElementById('batchUrlsInput').value.trim();
+    if (!input) {
+        showError('输入错误', '请输入群聊信息');
+        return;
+    }
+
+    const parsedUrls = parseBatchUrlInput(input);
+
+    if (parsedUrls.length === 0) {
+        showError('解析错误', '无法解析群聊信息，请检查格式');
+        return;
+    }
+
+    // 验证必填字段
+    const invalidItems = parsedUrls.filter(item => !item.url || !item.name);
+    if (invalidItems.length > 0) {
+        if (!await showConfirm(
+            '数据验证',
+            `发现 ${invalidItems.length} 个群聊信息不完整，是否继续导入其他 ${parsedUrls.length - invalidItems.length} 个群聊？`,
+            'warning'
+        )) {
+            return;
+        }
+        // 移除无效项目
+        parsedUrls.splice(0, parsedUrls.length, ...parsedUrls.filter(item => item.url && item.name));
+    }
+
+    if (parsedUrls.length === 0) {
+        showError('导入失败', '没有有效的群聊信息可以导入');
+        return;
+    }
+
+    if (!await showConfirm(
+        '确认导入',
+        `确定要导入 ${parsedUrls.length} 个群聊到当前机器吗？`,
+        'primary'
+    )) {
+        return;
+    }
+
+    // 获取配置
+    const duration = parseInt(document.getElementById('batchDuration').value);
+    const maxNum = parseInt(document.getElementById('batchMaxNum').value);
+    const isActive = document.getElementById('batchIsActive').checked;
+
+    // 开始批量导入
+    let successCount = 0;
+    let failureCount = 0;
+    const results = [];
+
+    // 显示进度
+    const progressInfo = showInfo('批量导入', `正在导入群聊... (0/${parsedUrls.length})`);
+
+    for (let i = 0; i < parsedUrls.length; i++) {
+        const item = parsedUrls[i];
+
+        try {
+            const data = {
+                config_id: currentConfigId,
+                url: item.url,
+                name: item.name,
+                duration: duration,
+                max_num: maxNum,
+                is_active: isActive
+            };
+
+            await apiCall('/api/url', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+
+            successCount++;
+            results.push({
+                ...item,
+                status: 'success',
+                message: '导入成功'
+            });
+
+        } catch (error) {
+            failureCount++;
+            results.push({
+                ...item,
+                status: 'error',
+                message: error.message || '导入失败'
+            });
+        }
+
+        // 更新进度（如果通知还存在）
+        if (progressInfo && progressInfo.parentNode) {
+            const messageElement = progressInfo.querySelector('.notification-message');
+            if (messageElement) {
+                messageElement.textContent = `正在导入群聊... (${i + 1}/${parsedUrls.length})`;
+            }
+        }
+    }
+
+    // 移除进度通知
+    if (progressInfo && progressInfo.parentNode) {
+        window.notificationSystem.hideNotification(progressInfo);
+    }
+
+    // 显示结果
+    const resultMessage = `批量导入完成！\n成功: ${successCount} 个\n失败: ${failureCount} 个`;
+
+    if (failureCount === 0) {
+        showSuccess('导入完成', resultMessage);
+    } else {
+        showWarning('导入完成', resultMessage);
+
+        // 显示详细的失败信息
+        const failedItems = results.filter(r => r.status === 'error');
+        if (failedItems.length > 0) {
+            console.log('导入失败的群聊:', failedItems);
+        }
+    }
+
+    // 关闭模态框
+    hideBatchImportUrlModal();
+
+    // 刷新数据
+    await loadDashboardData();
+}
+
+// 在页面加载完成后为批量导入按钮添加键盘快捷键支持
+document.addEventListener('keydown', function(e) {
+    // Ctrl + Shift + B: 批量导入群聊
+    if (e.ctrlKey && e.shiftKey && e.key === 'B') {
+        e.preventDefault();
+        showBatchImportUrlModal();
+    }
+});

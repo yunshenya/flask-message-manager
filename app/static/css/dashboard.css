@@ -1162,3 +1162,162 @@ body {
         justify-content: space-around !important;
     }
 }
+
+/* 批量导入模态框样式 */
+#batchImportUrlModal .form-group {
+    margin-bottom: 1rem;
+}
+
+#batchImportUrlModal label {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+#batchImportUrlModal textarea {
+    font-family: 'Courier New', Consolas, monospace;
+    line-height: 1.4;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#batchImportUrlModal textarea:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+#batchImportUrlModal input[type="number"]:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* 导入预览区域样式 */
+#importPreview {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 200px;
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+}
+
+#previewContent {
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+#previewContent::-webkit-scrollbar {
+    width: 6px;
+}
+
+#previewContent::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+#previewContent::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+#previewContent::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* 格式说明区域样式 */
+.format-info {
+    background: linear-gradient(135deg, #e3f2fd 0%, #f8f9fa 100%);
+    border-left: 4px solid #2196f3;
+    transition: transform 0.2s ease;
+}
+
+.format-info:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 导入进度指示器 */
+.import-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 4px;
+    color: #1976d2;
+    font-size: 0.9rem;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.import-progress .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #90caf9;
+    border-top: 2px solid #1976d2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    #batchImportUrlModal > div {
+        width: 95% !important;
+        padding: 1.5rem !important;
+        max-height: 90vh !important;
+    }
+
+    #batchImportUrlModal textarea {
+        font-size: 14px;
+        min-height: 200px;
+    }
+
+    #batchImportUrlModal .btn {
+        width: 100%;
+        margin: 0.25rem 0;
+    }
+
+    #batchImportUrlModal div[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+}
+
+/* 错误和成功状态样式 */
+.import-item-error {
+    background: linear-gradient(90deg, #f8d7da 0%, #ffffff 100%) !important;
+    border-left: 3px solid #dc3545 !important;
+}
+
+.import-item-success {
+    background: linear-gradient(90deg, #d4edda 0%, #ffffff 100%) !important;
+    border-left: 3px solid #28a745 !important;
+}
+
+/* 工具提示样式 */
+.import-tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.import-tooltip:hover::after {
+    opacity: 1;
+}
