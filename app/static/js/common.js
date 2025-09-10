@@ -154,7 +154,7 @@ function showBatchImportModal() {
                     placeholder="请输入消息，例如：&#10;早上好--------打卡&#10;晚安--------结束--------你好"
                     style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; resize: vertical;"
                 ></textarea>
-                <small style="color: #666;">支持的格式：使用"--------"分隔的单行文本</small>
+                <small style="color: #666;">支持的格式：使用"--------"分隔消息</small>
             </div>
             <div style="text-align: right; border-top: 1px solid #eee; padding-top: 1rem;">
                 <button type="button" class="btn btn-secondary" onclick="closeBatchImportModal()" style="margin-right: 1rem;">取消</button>
@@ -220,7 +220,7 @@ function clearAllMessages() {
         return;
     }
 
-    if (confirm(`确定要清空所有 ${currentMessages.length} 条消息吗？此操作不可撤销。`)) {
+    if (showConfirm("清理",`确定要清空所有 ${currentMessages.length} 条消息吗？此操作不可撤销。`)) {
         currentMessages = [];
         updateHiddenMessageField();
         renderMessageList();
@@ -258,7 +258,7 @@ function editMessage(index) {
 
 function removeMessage(index) {
     const message = currentMessages[index];
-    if (confirm(`确定要删除消息 "${message}" 吗？`)) {
+    if (showConfirm("删除",`确定要删除消息 "${message}" 吗？`)) {
         currentMessages.splice(index, 1);
         updateHiddenMessageField();
         renderMessageList();
