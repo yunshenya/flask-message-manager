@@ -2800,8 +2800,19 @@ function filterDeleteUrls() {
         return statusMatch && labelMatch && searchMatch;
     });
 
+    // 清理选择状态 - 移除不在筛选结果中的选择
+    const filteredIds = new Set(filteredDeleteUrls.map(url => url.id));
+    const updatedSelection = new Set();
+    selectedDeleteUrls.forEach(urlId => {
+        if (filteredIds.has(urlId)) {
+            updatedSelection.add(urlId);
+        }
+    });
+    selectedDeleteUrls = updatedSelection;
+
     // 更新显示
     displayDeleteUrls();
+    updateDeleteSelectionUI();
     updateDeleteStats();
 }
 
@@ -2878,6 +2889,8 @@ function toggleDeleteUrlSelection(urlId) {
 
 function toggleSelectAllDeleteUrls() {
     const selectAllCheckbox = document.getElementById('selectAllDeleteUrls');
+    if (!selectAllCheckbox) return;
+
     const isChecked = selectAllCheckbox.checked;
 
     if (isChecked) {
@@ -2888,6 +2901,7 @@ function toggleSelectAllDeleteUrls() {
         filteredDeleteUrls.forEach(url => selectedDeleteUrls.delete(url.id));
     }
 
+    // 立即更新UI状态
     updateDeleteSelectionUI();
     updateDeleteStats();
 }
@@ -2938,27 +2952,46 @@ function updateDeleteSelectionUI() {
 
     // 更新全选复选框状态
     const selectAllCheckbox = document.getElementById('selectAllDeleteUrls');
-    const filteredIds = filteredDeleteUrls.map(url => url.id);
-    const selectedFilteredCount = filteredIds.filter(id => selectedDeleteUrls.has(id)).length;
+    if (selectAllCheckbox) {
+        const filteredIds = filteredDeleteUrls.map(url => url.id);
+        const selectedFilteredCount = filteredIds.filter(id => selectedDeleteUrls.has(id)).length;
+        const totalFiltered = filteredIds.length;
 
-    if (selectedFilteredCount === 0) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-    } else if (selectedFilteredCount === filteredIds.length) {
-        selectAllCheckbox.checked = true;
-        selectAllCheckbox.indeterminate = false;
-    } else {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = true;
+        if (totalFiltered === 0) {
+            // 没有可选项目
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.disabled = true;
+        } else if (selectedFilteredCount === 0) {
+            // 没有选中任何项目
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.disabled = false;
+        } else if (selectedFilteredCount === totalFiltered) {
+            // 全部选中
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+            selectAllCheckbox.disabled = false;
+        } else {
+            // 部分选中
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+            selectAllCheckbox.disabled = false;
+        }
     }
 
     // 更新计数显示
     document.getElementById('selectedDeleteCount').textContent = `已选择: ${selectedDeleteUrls.size} 个`;
-    document.getElementById('deleteButtonCount').textContent = selectedDeleteUrls.size;
+    const deleteButtonCount = document.getElementById('deleteButtonCount');
+    if (deleteButtonCount) {
+        deleteButtonCount.textContent = selectedDeleteUrls.size;
+    }
 
     // 更新删除按钮状态
     const deleteBtn = document.getElementById('executeDeleteBtn');
-    deleteBtn.disabled = selectedDeleteUrls.size === 0;
+    if (deleteBtn) {
+        deleteBtn.disabled = selectedDeleteUrls.size === 0;
+    }
 }
 
 function updateDeleteStats() {
