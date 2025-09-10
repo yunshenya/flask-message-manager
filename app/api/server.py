@@ -508,3 +508,20 @@ def update_last_time():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+
+@bp.route('/update_phone_number', methods=['POST'])
+@token_required
+def update_phone_number():
+    pade_code = request.json.get('pade_code')
+    phone_number = request.json.get('phone_number')
+    config = ConfigData.query.filter_by(pade_code=pade_code).first()
+    if config:
+        config.phone_number = phone_number
+        db.session.commit()
+        return jsonify({
+            "message": f'Successfully update {pade_code} phone number',
+            'phone_number': phone_number
+        }), 200
+    return jsonify({'error': 'Config not found'}), 404

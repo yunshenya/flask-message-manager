@@ -20,6 +20,7 @@ class ConfigData(db.Model):
     pade_code = db.Column(db.Text)
     name = db.Column(db.Text)
     message = db.Column(db.Text)
+    phone_number = db.Column(db.Text)
 
     urls: Mapped[List[UrlData]] = relationship(backref='config', cascade='all, delete-orphan')
 
@@ -36,4 +37,5 @@ class ConfigData(db.Model):
             'pade_code': self.pade_code,
             'message': self.message,
             'name': self.name,
+            'phone': self.phone_number,
         }

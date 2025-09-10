@@ -601,7 +601,7 @@ function switchMachine() {
 function updateCurrentMachineInfo() {
     const infoDiv = document.getElementById('currentMachineInfo');
     const statusSpan = document.getElementById('currentMachineStatus');
-    const codeSpan = document.getElementById('currentMachineCode');
+    const phoneSpan = document.getElementById('currentMachinePhone');
     const editBtn = document.getElementById('editCurrentBtn');
 
     if (!currentConfigId || !availableMachines.length) {
@@ -612,7 +612,7 @@ function updateCurrentMachineInfo() {
 
     const machine = availableMachines.find(m => m.id === currentConfigId);
     if (machine) {
-        codeSpan.textContent = machine.pade_code || '无代码';
+        phoneSpan.textContent = machine.phone || '无号码';
         statusSpan.textContent = machine.is_active ? '激活' : '禁用';
         statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
         infoDiv.style.display = 'flex';
