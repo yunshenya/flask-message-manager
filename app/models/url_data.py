@@ -91,6 +91,8 @@ class UrlData(db.Model):
         self.last_time = None
         self.started_at = None
         self.stopped_at = None
+        self.label = None
+        self.status = None
         self.updated_at = datetime.datetime.now()
 
     def get_running_duration(self):

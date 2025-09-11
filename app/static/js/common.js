@@ -511,9 +511,13 @@ fadeOutStyle.textContent = `
 document.head.appendChild(fadeOutStyle);
 
 
-function removeMessage(index) {
+async function removeMessage(index) {
     const message = currentMessages[index];
-    if (showConfirm("删除",`确定要删除消息 "${message}" 吗？`)) {
+    const shortMessage = message.length > 10 ?
+        message.substring(0, 3) + "..." + message.substring(message.length - 2) :
+        message;
+
+    if (await showConfirm("删除", `确定要删除消息 "${shortMessage}" 吗？`)) {
         currentMessages.splice(index, 1);
         updateHiddenMessageField();
         renderMessageList();
