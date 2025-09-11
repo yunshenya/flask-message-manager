@@ -241,6 +241,7 @@ def batch_start_machines():
                         'response': response
                     })
                     machine.is_running = True
+                    db.session.commit()
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,
@@ -287,6 +288,7 @@ def batch_stop_machines():
                         'response': response
                     })
                     machine.is_running = False
+                    db.session.commit()
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,
