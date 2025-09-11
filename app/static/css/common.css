@@ -67,7 +67,7 @@
     text-align: center;
     background: white;
     transition: all 0.3s ease;
-    letter-spacing: 0.5px; /* 减小字符间距 */
+    letter-spacing: 1px; /* 减小字符间距 */
     height: 36px; /* 固定高度 */
 }
 

@@ -1,7 +1,7 @@
 import datetime
 import json
 from typing import List, Optional
-
+from loguru import logger
 from app import db
 
 
@@ -24,7 +24,8 @@ class CleanupTask(db.Model):
         """获取清理类型列表"""
         try:
             return json.loads(self.cleanup_types)
-        except:
+        except Exception as e:
+            logger.error(e)
             return []
 
     def set_cleanup_types_list(self, types: List[str]):
@@ -37,7 +38,8 @@ class CleanupTask(db.Model):
             return None
         try:
             return json.loads(self.target_configs)
-        except:
+        except Exception as e:
+            logger.error(e)
             return None
 
     def set_target_configs_list(self, configs: Optional[List[int]]):
