@@ -612,7 +612,7 @@ function updateCurrentMachineInfo() {
 
     const machine = availableMachines.find(m => m.id === currentConfigId);
     if (machine) {
-        phoneSpan.textContent = machine.phone || '无号码';
+        phoneSpan.textContent = machine.phone || '等待获取中';
         statusSpan.textContent = machine.is_active ? '激活' : '禁用';
         statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
         infoDiv.style.display = 'flex';
