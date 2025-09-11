@@ -1318,6 +1318,27 @@ function displayMachines(machines) {
         return;
     }
 
+    // 安全转义函数
+    function escapeForAttribute(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/\\/g, "\\\\")
+            .replace(/'/g, "\\'")
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, "\\n")
+            .replace(/\r/g, "\\r");
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     tableDiv.innerHTML = `
         <div style="overflow-x: auto;">
             <table style="min-width: 1000px;">
@@ -1339,18 +1360,25 @@ function displayMachines(machines) {
         const message = machine.message || '-';
         const displayMessage = message.length > 5 ? message.substring(0, 5) + '...' : message;
         const isInactive = !machine.is_active;
+        const machineName = machine.name || ('机器' + machine.id);
+        const machineNameForDelete = machine.name || machine.message || ('机器' + machine.id);
+
+        // 预先转义所有需要在 onclick 中使用的字符串
+        const escapedMessage = escapeForAttribute(message);
+        const escapedMachineName = escapeForAttribute(machineName);
+        const escapedMachineNameForDelete = escapeForAttribute(machineNameForDelete);
 
         return `
                             <tr ${isInactive ? 'class="inactive-machine-row"' : ''}>
                                 <td style="width: 60px;">${machine.id}</td>
-                                <td style="width: 120px; word-wrap: break-word;">${machine.name || '-'}</td>
+                                <td style="width: 120px; word-wrap: break-word;">${escapeHtml(machine.name) || '-'}</td>
                                 <td style="width: 150px;">
-                                    <span class="message-link" onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
-                                        ${displayMessage}
+                                    <span class="message-link" onclick="showMessageDetail('${escapedMessage}', '${escapedMachineName}')">
+                                        ${escapeHtml(displayMessage)}
                                     </span>
                                 </td>
-                                <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${machine.pade_code}</td>
-                                <td style="width: 200px; word-wrap: break-word;">${machine.description || '-'}</td>
+                                <td style="width: 150px; font-family: monospace; font-size: 0.85em;">${escapeHtml(machine.pade_code)}</td>
+                                <td style="width: 200px; word-wrap: break-word;">${escapeHtml(machine.description) || '-'}</td>
                                 <td style="width: 80px;">
                                     <span class="machine-status ${machine.is_active ? 'status-active' : 'inactive-status-badge'}">
                                         ${machine.is_active ? '激活' : '未激活'}
@@ -1360,7 +1388,7 @@ function displayMachines(machines) {
                                 <td style="width: 140px; font-size: 0.85em;">${new Date(machine.created_at).toLocaleString()}</td>
                                 <td style="width: 220px;">
                                     ${isInactive ?
-            `<button class="btn btn-success btn-sm activate-btn" onclick="activateMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">✅ 激活</button>`
+            `<button class="btn btn-success btn-sm activate-btn" onclick="activateMachine(${machine.id}, '${escapedMachineNameForDelete}')" style="margin: 2px;">✅ 激活</button>`
             : ''
         }
                                     <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id})" style="margin: 2px;">编辑</button>
@@ -1368,7 +1396,7 @@ function displayMachines(machines) {
             `<button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})" style="margin: 2px;">禁用</button>`
             : ''
         }
-                                    <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.message).replace(/'/g, '&#39;')}')" style="margin: 2px;">删除</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${escapedMachineNameForDelete}')" style="margin: 2px;">删除</button>
                                 </td>
                             </tr>
                         `;
@@ -1378,7 +1406,6 @@ function displayMachines(machines) {
         </div>
     `;
 }
-
 
 
 

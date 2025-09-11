@@ -1166,6 +1166,28 @@ async function editCurrentMachine() {
     await editMachine(currentConfigId);
 }
 
+// 安全的 HTML 转义辅助函数
+function escapeHtml(unsafe) {
+    if (unsafe == null) return '';
+    return String(unsafe)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// 用于 onclick 属性的安全转义
+function escapeForAttribute(unsafe) {
+    if (unsafe == null) return '';
+    return String(unsafe)
+        .replace(/\\/g, "\\\\")  // 转义反斜杠
+        .replace(/'/g, "\\'")    // 转义单引号
+        .replace(/"/g, '\\"')    // 转义双引号
+        .replace(/\n/g, "\\n")   // 转义换行符
+        .replace(/\r/g, "\\r");  // 转义回车符
+}
+
 async function loadMachineManagementList() {
     try {
         const machines = await apiCall('/api/machines');
@@ -1175,6 +1197,53 @@ async function loadMachineManagementList() {
             listDiv.innerHTML = '<p>暂无机器配置</p>';
             return;
         }
+
+        const tableRows = machines.map(machine => {
+            const message = machine.message || null;
+            const machineName = machine.name || ('机器' + machine.id);
+            const machineDisplayName = machine.name || machine.pade_code || '未知';
+
+            let messageDisplay;
+            if (message && message.trim() !== '') {
+                const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
+
+                messageDisplay = `
+                    <span style="cursor: pointer; color: #007bff; text-decoration: underline;" 
+                          onclick="showMessageDetail('${escapeForAttribute(message)}', '${escapeForAttribute(machineName)}')">
+                        ${escapeHtml(displayMessage)}
+                    </span>
+                `;
+            } else {
+                messageDisplay = `
+                    <span style="color: #6c757d; font-style: italic;">
+                        暂无消息
+                    </span>
+                `;
+            }
+
+            return `
+                <tr>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">${escapeHtml(machine.name) || '-'}</td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        ${messageDisplay}
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">${escapeHtml(machine.pade_code)}</td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
+                            ${machine.is_active ? '激活' : '禁用'}
+                        </span>
+                    </td>
+                    <td style="padding: 0.5rem; border: 1px solid #ddd;">
+                        <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id})">编辑</button>
+                        <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
+                            ${machine.is_active ? '禁用' : '激活'}
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${escapeForAttribute(machineDisplayName)}')">删除</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
 
         listDiv.innerHTML = `
             <table style="width: 100%; border-collapse: collapse;">
@@ -1189,53 +1258,13 @@ async function loadMachineManagementList() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${machines.map(machine => {
-            const message = machine.message || null;
-            let messageDisplay;
-            if (message && message.trim() !== '') {
-                const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
-                messageDisplay = `
-            <span style="cursor: pointer; color: #007bff; text-decoration: underline;" 
-                  onclick="showMessageDetail('${message.replace(/'/g, '&#39;')}', '${(machine.name || '机器' + machine.id).replace(/'/g, '&#39;')}')">
-                ${displayMessage}
-            </span>
-                        `;
-            } else {
-                messageDisplay = `
-                        <span style="color: #6c757d; font-style: italic;">
-                            暂无消息
-                        </span>
-                    `;
-            }
-
-            return `
-                        <tr>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.id}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.name || '-'}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                                ${messageDisplay}
-                            </td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">${machine.pade_code}</td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                                <span class="machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}">
-                                    ${machine.is_active ? '激活' : '禁用'}
-                                </span>
-                            </td>
-                            <td style="padding: 0.5rem; border: 1px solid #ddd;">
-                                <button class="btn btn-info btn-sm" onclick="editMachine(${machine.id})">编辑</button>
-                                <button class="btn btn-warning btn-sm" onclick="toggleMachine(${machine.id})">
-                                    ${machine.is_active ? '禁用' : '激活'}
-                                </button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteMachine(${machine.id}, '${(machine.name || machine.pade_code).replace(/'/g, '&#39;')}')">删除</button>
-                            </td>
-                        </tr>
-                    `
-        }).join('')}
+                    ${tableRows}
                 </tbody>
             </table>
         `;
     } catch (error) {
-        showError('操作失败', error);
+        console.error('加载机器列表失败:', error);
+        showError('操作失败', error.message || '加载机器列表失败');
     }
 }
 
