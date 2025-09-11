@@ -1325,8 +1325,11 @@ function displayMachines(machines) {
             .replace(/\\/g, "\\\\")
             .replace(/'/g, "\\'")
             .replace(/"/g, '\\"')
-            .replace(/\n/g, "\\n")
-            .replace(/\r/g, "\\r");
+            .replace(/\n/g, "\\n")   // 关键：转义换行符
+            .replace(/\r/g, "\\r")   // 关键：转义回车符
+            .replace(/\t/g, "\\t")   // 转义制表符
+            .replace(/\u2028/g, "\\u2028")  // 转义行分隔符
+            .replace(/\u2029/g, "\\u2029"); // 转义段分隔符
     }
 
     function escapeHtml(str) {
@@ -1336,7 +1339,9 @@ function displayMachines(machines) {
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+            .replace(/'/g, "&#039;")
+            .replace(/\n/g, "<br>")  // HTML中显示换行
+            .replace(/\r/g, "");     // 移除回车符
     }
 
     tableDiv.innerHTML = `

@@ -125,8 +125,24 @@ async function showVmosMachinesList() {
 }
 
 function showMessageDetail(message, machineName) {
-    document.getElementById('messageDetailTitle').textContent = `${machineName} - 消息详情`;
-    document.getElementById('messageDetailContent').textContent = message;
+    const cleanMessage = message
+        .replace(/\\n/g, '\n')    // 将 \n 转换回真正的换行符
+        .replace(/\\r/g, '\r')    // 将 \r 转换回真正的回车符
+        .replace(/\\t/g, '\t')    // 将 \t 转换回真正的制表符
+        .replace(/\\'/g, "'")     // 将 \' 转换回单引号
+        .replace(/\\"/g, '"')     // 将 \" 转换回双引号
+        .replace(/\\\\/g, '\\');  // 将 \\ 转换回反斜杠
+
+    const cleanMachineName = machineName
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, '\\');
+
+    document.getElementById('messageDetailTitle').textContent = `${cleanMachineName} - 消息详情`;
+    document.getElementById('messageDetailContent').textContent = cleanMessage;
     document.getElementById('messageDetailModal').style.display = 'block';
 }
 

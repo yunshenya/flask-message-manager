@@ -1174,18 +1174,21 @@ function escapeHtml(unsafe) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+        .replace(/'/g, "&#039;")
+        .replace(/\n/g, "<br>")  // HTML中显示换行
+        .replace(/\r/g, "");
 }
 
 // 用于 onclick 属性的安全转义
 function escapeForAttribute(unsafe) {
     if (unsafe == null) return '';
     return String(unsafe)
-        .replace(/\\/g, "\\\\")  // 转义反斜杠
-        .replace(/'/g, "\\'")    // 转义单引号
-        .replace(/"/g, '\\"')    // 转义双引号
-        .replace(/\n/g, "\\n")   // 转义换行符
-        .replace(/\r/g, "\\r");  // 转义回车符
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")   // 关键：转义换行符
+        .replace(/\r/g, "\\r")   // 关键：转义回车符
+        .replace(/\t/g, "\\t");
 }
 
 async function loadMachineManagementList() {
