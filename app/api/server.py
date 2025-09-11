@@ -91,6 +91,11 @@ def stop():
                     stopped_urls.append(url.to_dict())
             config.is_running = False
             db.session.commit()
+            socketio.emit('machine_info_update', {
+                'machine_id': config.id,
+                'is_running': False,
+                'phone_number': config.phone_number
+            })
 
             # 推送所有停止的URL事件
             for url_data in stopped_urls:
@@ -146,6 +151,12 @@ def start():
             config.is_running = True
             db.session.commit()
 
+            socketio.emit('machine_info_update', {
+                'machine_id': config.id,
+                'is_running': True,
+                'phone_number': config.phone_number
+            })
+
             # 推送所有启动的URL事件
             for url_data in started_urls:
                 socketio.emit('url_started', {
@@ -191,8 +202,6 @@ def add_execute_num():
 
         if url.execute():
             db.session.commit()
-
-            # 添加这部分 - 实时推送更新
             socketio.emit('url_executed', {
                 'url_id': url_id,
                 'config_id': url.config_id,
@@ -544,6 +553,11 @@ def update_phone_number():
     if config:
         config.phone_number = phone_number
         db.session.commit()
+        socketio.emit('machine_info_update', {
+            'machine_id': config.id,
+            'is_running': config.is_running,
+            'phone_number': phone_number
+        })
         return jsonify({
             "message": f'Successfully update {pade_code} phone number',
             'phone_number': phone_number

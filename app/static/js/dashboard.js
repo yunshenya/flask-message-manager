@@ -138,8 +138,28 @@ function setupWebSocketEvents() {
             updateSingleUrlItem(data.url_data);
         }
     });
+
+    socket.on('machine_info_update', function (data) {
+        updateMachineInfo(data.machine_id, data.is_running, data.phone_number);
+    });
 }
 
+function updateMachineInfo(machineId, isRunning, phoneNumber) {
+    const machine = availableMachines.find(m => m.id === machineId);
+    if (machine) {
+        // 只更新这两个字段
+        machine.is_running = isRunning;
+        if (phoneNumber !== undefined && phoneNumber !== null) {
+            machine.phone = phoneNumber;
+            machine.phone_number = phoneNumber;
+        }
+
+        // 如果是当前选中的机器，更新显示
+        if (currentConfigId === machineId) {
+            updateCurrentMachineInfo();
+        }
+    }
+}
 
 // 启动运行时长更新
 function startDurationUpdates() {
@@ -612,11 +632,31 @@ function updateCurrentMachineInfo() {
 
     const machine = availableMachines.find(m => m.id === currentConfigId);
     if (machine) {
-        phoneSpan.textContent = machine.phone || '等待获取中';
+        // 更新电话号码显示
+        phoneSpan.textContent = machine.phone || machine.phone_number || '等待获取中';
+
+        // 更新运行状态
         statusSpan.textContent = machine.is_running ? '运行中' : '未运行';
-        statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
+
+        // 更新状态样式
+        const statusClass = machine.is_active ? 'status-active' : 'status-inactive';
+        statusSpan.className = `machine-status ${statusClass}`;
+
+        // 如果机器正在运行，添加脉冲动画
+        if (machine.is_running) {
+            statusSpan.style.animation = 'pulse 2s infinite';
+        } else {
+            statusSpan.style.animation = '';
+        }
+
         infoDiv.style.display = 'flex';
         editBtn.style.display = 'inline-block';
+
+        // 添加更新动画效果
+        infoDiv.classList.add('updating');
+        setTimeout(() => {
+            infoDiv.classList.remove('updating');
+        }, 600);
     } else {
         infoDiv.style.display = 'none';
         editBtn.style.display = 'none';
@@ -2238,8 +2278,7 @@ async function editMachine(machineId) {
         messageField.value = machine.message || '';
 
         // 解析消息为数组
-        const messages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
-        currentMessages = messages;
+        currentMessages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
 
         showEditMachineModal();
     } catch (error) {
@@ -2508,12 +2547,16 @@ function parseBatchUrlInput(input) {
         let name = '';
 
         // 检查是否包含分隔符
-        if (line.includes('|')) {
-            const parts = line.split('|').map(part => part.trim());
+        if (line.includes('｜')) {
+            const parts = line.split('｜').map(part => part.trim());
             url = parts[0] || '';
             name = parts[1] || parts[0] || `群聊_${i + 1}`;
         } else if (line.includes('----')) {
             const parts = line.split('----').map(part => part.trim());
+            url = parts[0] || '';
+            name = parts[1] || parts[0] || `群聊_${i + 1}`;
+        }else if (line.includes("|")){
+            const parts = line.split('|').map(part => part.trim());
             url = parts[0] || '';
             name = parts[1] || parts[0] || `群聊_${i + 1}`;
         } else {

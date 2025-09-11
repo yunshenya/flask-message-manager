@@ -4,7 +4,7 @@ from typing import Any
 from flask import jsonify, request
 from loguru import logger
 
-from app import db, Config
+from app import db, Config, socketio
 from app.api import bp
 from app.auth.decorators import login_required, admin_required
 from app.models.config_data import ConfigData
@@ -242,6 +242,13 @@ def batch_start_machines():
                     })
                     machine.is_running = True
                     db.session.commit()
+
+                    socketio.emit('machine_info_update', {
+                        'machine_id': machine.id,
+                        'is_running': True,
+                        'phone_number': machine.phone_number
+                    })
+
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,
@@ -279,16 +286,22 @@ def batch_stop_machines():
             if machine.pade_code:
                 try:
                     # 调用VMOS API停止机器
-                    response = stop_app([machine.pade_code], package_name=Config.PKG_NAME)
+                    response_script = stop_app([machine.pade_code], package_name=Config.PKG_NAME)
+                    response_tg = stop_app([machine.pade_code], package_name=Config.TG_PKG_NAME)
                     results.append({
                         'machine_id': machine.id,
                         'machine_name': machine.message,
                         'status': 'success',
                         'message': 'Stopped successfully',
-                        'response': response
+                        'response': f"停止脚本成功:{response_script}, 停止tg成功:{response_tg}"
                     })
                     machine.is_running = False
                     db.session.commit()
+                    socketio.emit('machine_info_update', {
+                        'machine_id': machine.id,
+                        'is_running': False,
+                        'phone_number': machine.phone_number
+                    })
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,
