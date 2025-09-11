@@ -18,21 +18,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (document.hidden) {
             // 页面隐藏时停止更新
             stopDurationUpdates();
-            console.log('页面隐藏，停止实时更新');
         } else {
             // 页面显示时恢复更新并强制刷新
-            console.log('页面显示，恢复实时更新');
             if (isWebSocketConnected && currentConfigId) {
                 startDurationUpdates();
                 // 强制刷新确保状态同步
                 loadDashboardData().then(() => {
-                    console.log('状态同步完成');
                 }).catch(error => {
                     console.error('状态同步失败:', error);
                 });
             } else if (currentConfigId) {
                 loadDashboardData().then(() => {
-                    console.log('数据刷新完成（WebSocket未连接）');
                 });
             }
         }
@@ -41,10 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // WebSocket 初始化函数
 function initWebSocket() {
-    console.log('正在初始化 WebSocket...');
-
     if (typeof io === 'undefined') {
-        console.error('Socket.IO 库未加载，请检查网络连接');
         showError('连接错误', 'Socket.IO 库加载失败，实时更新功能不可用');
         return;
     }
@@ -80,7 +73,6 @@ function initWebSocket() {
 // 设置 WebSocket 事件监听
 function setupWebSocketEvents() {
     socket.on('connect', function () {
-        console.log('WebSocket 连接成功');
         isWebSocketConnected = true;
         startDurationUpdates();
     });
@@ -90,10 +82,6 @@ function setupWebSocketEvents() {
         isWebSocketConnected = false;
         isWebSocketInitialized = false;
         stopDurationUpdates();
-    });
-
-    socket.on('connect_error', function (error) {
-        console.error('WebSocket 连接错误:', error);
     });
 
     // 监听 URL 执行更新
@@ -199,9 +187,7 @@ function updateRunningUrlsCache(urlData) {
 // 从运行中URL缓存移除
 function removeFromRunningUrlsCache(urlId) {
     if (runningUrls.has(urlId)) {
-        const urlInfo = runningUrls.get(urlId);
         runningUrls.delete(urlId);
-        console.log(`➖ 从缓存移除已停止群聊: ${urlInfo.name}`);
     }
 }
 
@@ -355,7 +341,6 @@ async function updateStatsFromSocket() {
 
 async function loadDashboardData() {
     if (!currentConfigId) {
-        console.warn('没有选中的机器');
         return;
     }
 
@@ -366,14 +351,10 @@ async function loadDashboardData() {
             ? `/api/config/${currentConfigId}/urls?include_inactive=true`
             : `/api/config/${currentConfigId}/urls`;
 
-        console.log('加载数据，包含未激活:', includeInactive); // 调试日志
-
         const [statusData, urlsData] = await Promise.all([
             apiCall(`/api/config/${currentConfigId}/status`),
             apiCall(urlsEndpoint)
         ]);
-
-        console.log('获取到的URL数据:', urlsData); // 调试日志
 
         currentConfigData = statusData.config;
 
@@ -1862,8 +1843,6 @@ async function showInactiveUrls() {
         // 强制重新获取最新数据，不使用缓存
         const response = await apiCall(`/api/config/${currentConfigId}/urls/inactive?_t=${Date.now()}`);
 
-        console.log('显示未激活群聊，获取到:', response); // 调试日志
-
         if (response.urls.length === 0) {
             showInfo('提示', '当前机器没有未激活的群聊');
             return;
@@ -2133,8 +2112,6 @@ async function refreshInactiveUrlsList() {
 
     try {
         const response = await apiCall(`/api/config/${currentConfigId}/urls/inactive`);
-
-        console.log('刷新未激活列表，获取到:', response); // 调试日志
 
         if (response.urls.length === 0) {
             // 没有未激活群聊了，关闭窗口

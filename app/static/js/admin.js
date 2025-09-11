@@ -527,8 +527,6 @@ async function editCleanupTask(taskId) {
             method: 'GET'
         });
 
-        console.log('获取到的任务数据:', task); // 调试用
-
         // 先加载可用配置
         await loadAvailableConfigs();
 
@@ -571,11 +569,9 @@ async function editCleanupTask(taskId) {
             });
         }
 
-        console.log('表单设置完成'); // 调试用
         document.getElementById('addCleanupTaskModal').style.display = 'block';
 
     } catch (error) {
-        console.error('编辑任务失败:', error); // 调试用
         showError('加载失败', '获取任务信息失败: ' + error.message);
     }
 }
@@ -985,8 +981,6 @@ async function showInactiveMachines() {
         // 强制重新获取最新数据，不使用缓存
         const machines = await apiCall(`/api/machines/inactive?_t=${Date.now()}`);
 
-        console.log('显示未激活机器，获取到:', machines); // 调试日志
-
         if (machines.length === 0) {
             showInfo('提示', '没有找到未激活的机器');
             return;
@@ -1224,8 +1218,6 @@ async function checkAndUpdateInactiveMachinesList() {
     try {
         // 强制获取最新的未激活机器数据
         const machines = await apiCall(`/api/machines/inactive?_t=${Date.now()}`);
-
-        console.log('刷新未激活机器列表，获取到:', machines); // 调试日志
 
         if (machines.length === 0) {
             // 没有未激活机器了，关闭窗口
