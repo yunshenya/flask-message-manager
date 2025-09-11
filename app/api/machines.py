@@ -2,12 +2,13 @@ import datetime
 from typing import Any
 
 from flask import jsonify, request
+from loguru import logger
 
 from app import db, Config
 from app.api import bp
 from app.auth.decorators import login_required, admin_required
 from app.models.config_data import ConfigData
-from app.utils.vmos import get_phone_list, start_app
+from app.utils.vmos import get_phone_list, start_app, stop_app
 
 
 @bp.route('/machines', methods=['GET'])
@@ -137,8 +138,18 @@ def toggle_machine_status(machine_id):
         if not machine:
             return jsonify({'error': 'Machine not found'}), 404
 
-        machine.is_active = not machine.is_active
-        machine.updated_at = datetime.datetime.now()
+        if machine.is_active:
+            pade_code = machine.pade_code
+            result = stop_app([pade_code], package_name=Config.PKG_NAME)
+            logger.success(f"{pade_code}: 停止成功, {result}")
+            result_tg = stop_app([pade_code], package_name=Config.TG_PKG_NAME)
+            logger.success(f"{pade_code}: 停止成功, {result_tg}")
+            machine.is_active = False
+            machine.updated_at = datetime.datetime.now()
+        else:
+            machine.is_active = True
+            machine.updated_at = datetime.datetime.now()
+
         db.session.commit()
 
         return jsonify({
