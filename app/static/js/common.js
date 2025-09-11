@@ -230,13 +230,13 @@ function processBatchImport() {
 }
 
 // 清空所有消息 - 通用函数
-function clearAllMessages() {
+async function clearAllMessages() {
     if (currentMessages.length === 0) {
         showInfo('提示', '当前没有消息需要清空');
         return;
     }
 
-    if (showConfirm("清理",`确定要清空所有 ${currentMessages.length} 条消息吗？此操作不可撤销。`)) {
+    if (await showConfirm("清理",`确定要清空所有 ${currentMessages.length} 条消息吗？此操作不可撤销。`)) {
         currentMessages = [];
         updateHiddenMessageField();
         renderMessageList();
