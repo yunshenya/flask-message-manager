@@ -1208,7 +1208,7 @@ async function loadMachineManagementList() {
 
             let messageDisplay;
             if (message && message.trim() !== '') {
-                const displayMessage = message.length > 10 ? message.substring(0, 10) + '...' : message;
+                const displayMessage = message.length > 5 ?  message.substring(0, 2)+ "..." + message.substring(message.length - 3) : message;
 
                 messageDisplay = `
                     <span style="cursor: pointer; color: #007bff; text-decoration: underline;" 
