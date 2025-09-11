@@ -7,8 +7,6 @@ from typing import Any
 
 import requests
 
-from app import Config
-
 
 class VmosUtil(object):
     def __init__(self, url, data=None):
@@ -16,12 +14,26 @@ class VmosUtil(object):
             data = {}
         self._url = url
         self._data = data
-        self._ak = Config.ACCESS_KEY
-        self._sk = Config.SECRET_ACCESS
+
+        # 动态获取配置
+        self._ak, self._sk = self._get_dynamic_credentials()
+
         self._x_date = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
         self._content_type = "application/json;charset=UTF-8"
         self._signed_headers = "content-type;host;x-content-sha256;x-date"
         self._host = "api.vmoscloud.com"
+
+    def _get_dynamic_credentials(self):
+        """动态获取VMOS凭证"""
+        try:
+            from app.utils.dynamic_config import get_dynamic_config
+            access_key = get_dynamic_config('ACCESS_KEY')
+            secret_access = get_dynamic_config('SECRET_ACCESS')
+            return access_key, secret_access
+        except ImportError:
+            # 降级到静态配置
+            from app import Config
+            return Config.ACCESS_KEY, Config.SECRET_ACCESS
 
     def _get_signature(self):
         json_string: Any = json.dumps(self._data, separators=(',', ':'), ensure_ascii=False)

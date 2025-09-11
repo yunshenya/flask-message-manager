@@ -32,7 +32,7 @@ def get_system_configs():
 @bp.route('/system-configs/<int:config_id>', methods=['PUT'])
 @admin_required
 def update_system_config(config_id):
-    """更新系统配置"""
+    """更新系统配置并立即生效"""
     try:
         config = db.session.get(SystemConfig, config_id)
         if not config:
@@ -43,23 +43,116 @@ def update_system_config(config_id):
             return jsonify({'error': 'Missing value parameter'}), 400
 
         old_value = config.value
-        config.value = data['value']
+        new_value = data['value']
 
+        # 更新数据库
+        config.value = new_value
         if 'description' in data:
             config.description = data['description']
-
         config.updated_at = datetime.datetime.now()
+
         db.session.commit()
 
-        return jsonify({
-            'message': f'配置 {config.key} 已更新',
-            'config': config.to_dict(),
-            'old_value': old_value if not config.is_sensitive else '***HIDDEN***'
-        })
+        # 立即应用配置变更（动态生效）
+        try:
+            from app.utils.dynamic_config import dynamic_config
+            dynamic_config.set_config(config.key, new_value)
+
+            # 特殊配置的即时处理
+            immediate_effect_result = apply_immediate_effect(config.key, new_value, old_value)
+
+            response_data = {
+                'message': f'配置 {config.key} 已更新并立即生效',
+                'config': config.to_dict(),
+                'old_value': old_value if not config.is_sensitive else '***HIDDEN***',
+                'immediate_effect': immediate_effect_result
+            }
+
+        except Exception as e:
+            # 如果动态配置失败，至少数据库已更新
+            response_data = {
+                'message': f'配置 {config.key} 已更新到数据库，但动态生效失败',
+                'config': config.to_dict(),
+                'old_value': old_value if not config.is_sensitive else '***HIDDEN***',
+                'warning': f'动态生效失败: {str(e)}'
+            }
+
+        return jsonify(response_data)
 
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+def apply_immediate_effect(key: str, new_value, old_value) -> dict:
+    """应用配置的立即生效"""
+    result = {'success': True, 'effects': []}
+
+    try:
+        # 更新Flask配置
+        from flask import current_app
+        from app import Config
+
+        # 转换值类型
+        converted_value = convert_config_value(new_value)
+
+        # 更新应用配置
+        current_app.config[key] = converted_value
+        setattr(Config, key, converted_value)
+        result['effects'].append(f'Flask配置 {key} 已更新')
+
+        # 特殊配置的处理
+        if key == 'DEBUG':
+            current_app.debug = bool(converted_value)
+            result['effects'].append(f'调试模式已{"启用" if converted_value else "禁用"}')
+
+        elif key in ['ACCESS_KEY', 'SECRET_ACCESS']:
+            result['effects'].append('VMOS API配置已更新，新请求将使用新密钥')
+
+        elif key == 'API_SECRET_TOKEN':
+            result['effects'].append('API访问令牌已更新，新API请求将使用新令牌')
+
+        elif key in ['PKG_NAME', 'TG_PKG_NAME']:
+            result['effects'].append('应用包名已更新，新的应用控制操作将使用新包名')
+
+        elif key == 'DATABASE_URL':
+            result['effects'].append('数据库URL已更新到配置，但建议重启应用以完全生效')
+            result['warning'] = '数据库配置变更建议重启应用'
+
+        elif key.startswith('SUCCESS_TIME_') or key == 'RESET_TIME':
+            result['effects'].append('时间配置已更新，新创建的机器将使用新设置')
+
+        else:
+            result['effects'].append(f'配置 {key} 已更新到内存')
+
+    except Exception as e:
+        result['success'] = False
+        result['error'] = str(e)
+
+    return result
+
+
+def convert_config_value(value: str):
+    """转换配置值到适当的类型"""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value_lower = value.lower()
+        # 布尔值转换
+        if value_lower in ('true', 'false'):
+            return value_lower == 'true'
+        # 数字转换
+        if value.isdigit():
+            return int(value)
+        # 小数转换
+        try:
+            if '.' in value:
+                return float(value)
+        except ValueError:
+            pass
+
+    return value
 
 
 @bp.route('/system-configs', methods=['POST'])
@@ -91,8 +184,15 @@ def create_system_config():
 
         db.session.commit()
 
+        # 立即应用新配置
+        try:
+            from app.utils.dynamic_config import dynamic_config
+            dynamic_config.set_config(config.key, config.value)
+        except Exception as e:
+            pass  # 新配置立即生效失败不影响创建
+
         return jsonify({
-            'message': f'配置 {config.key} 已创建',
+            'message': f'配置 {config.key} 已创建并立即生效',
             'config': config.to_dict()
         }), 201
 
@@ -113,6 +213,13 @@ def delete_system_config(config_id):
         config_key = config.key
         db.session.delete(config)
         db.session.commit()
+
+        # 从动态配置中移除
+        try:
+            from app.utils.dynamic_config import dynamic_config
+            dynamic_config.reload_config(config_key)
+        except Exception:
+            pass
 
         return jsonify({
             'message': f'配置 {config_key} 已删除'
@@ -207,6 +314,13 @@ def sync_from_env():
                             existing.value = value
                             existing.updated_at = datetime.datetime.now()
                             updated_count += 1
+
+                            # 立即应用变更
+                            try:
+                                from app.utils.dynamic_config import dynamic_config
+                                dynamic_config.set_config(key, value)
+                            except Exception:
+                                pass
                     else:
                         # 根据key推断配置分类和敏感性
                         category = 'general'
@@ -224,7 +338,7 @@ def sync_from_env():
                             category = 'vmos'
                             is_sensitive = True
 
-                        SystemConfig.set_config(
+                        config = SystemConfig.set_config(
                             key=key,
                             value=value,
                             description=f'从.env文件同步 (行 {line_num})',
@@ -233,10 +347,17 @@ def sync_from_env():
                         )
                         created_count += 1
 
+                        # 立即应用新配置
+                        try:
+                            from app.utils.dynamic_config import dynamic_config
+                            dynamic_config.set_config(key, value)
+                        except Exception:
+                            pass
+
         db.session.commit()
 
         return jsonify({
-            'message': f'从.env文件同步完成',
+            'message': f'从.env文件同步完成，配置已立即生效',
             'created_count': created_count,
             'updated_count': updated_count,
             'total_processed': created_count + updated_count
@@ -272,6 +393,10 @@ def test_config(config_key):
 
         elif config_key in ['ACCESS_KEY', 'SECRET_ACCESS']:
             try:
+                # 临时更新配置进行测试
+                from app.utils.dynamic_config import dynamic_config
+                dynamic_config.set_config(config_key, config.value)
+
                 from app.utils.vmos import get_phone_list
                 result = get_phone_list()
                 if result and 'data' in result:
@@ -286,5 +411,20 @@ def test_config(config_key):
             'test_result': test_result
         })
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/system-configs/reload-all', methods=['POST'])
+@admin_required
+def reload_all_configs():
+    """重新加载所有配置"""
+    try:
+        from app.utils.dynamic_config import dynamic_config
+        dynamic_config.reload_all_configs()
+
+        return jsonify({
+            'message': '所有配置已重新加载并立即生效'
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500

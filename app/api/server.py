@@ -3,11 +3,29 @@ import datetime
 from flask import jsonify, request
 from loguru import logger
 
-from app import Config, db, socketio
+from app import db, socketio
 from app.api import bp
 from app.auth.decorators import login_required, token_required
 from app.models import UrlData, ConfigData
+from app.utils.dynamic_config import get_dynamic_config
 from app.utils.vmos import stop_app, start_app
+
+
+def get_current_pkg_names():
+    """动态获取当前的包名配置"""
+    try:
+        from app.utils.dynamic_config import get_dynamic_config
+        return {
+            'pkg_name': get_dynamic_config('PKG_NAME'),
+            'tg_pkg_name': get_dynamic_config('TG_PKG_NAME')
+        }
+    except ImportError:
+        from app import Config
+        return {
+            'pkg_name': Config.PKG_NAME,
+            'tg_pkg_name': Config.TG_PKG_NAME
+        }
+
 
 
 @bp.route("/callback", methods=["POST"])
@@ -53,10 +71,13 @@ def stop():
         return jsonify({"error": "padcode 参数缺失"}), 400
 
     try:
+        # 动态获取包名配置
+        pkg_names = get_current_pkg_names()
+
         # 停止VMOS应用
-        result = stop_app([pad_code], package_name=Config.PKG_NAME)
+        result = stop_app([pad_code], package_name=pkg_names['pkg_name'])
         logger.success(f"{pad_code}: 停止成功, {result}")
-        result_tg = stop_app([pad_code], package_name=Config.TG_PKG_NAME)
+        result_tg = stop_app([pad_code], package_name=pkg_names['tg_pkg_name'])
         logger.success(f"{pad_code}: 停止成功, {result_tg}")
 
         # 更新数据库中的运行状态
@@ -100,8 +121,11 @@ def start():
         return jsonify({"error": "padcode 参数缺失"}), 400
 
     try:
+        # 动态获取包名配置
+        pkg_names = get_current_pkg_names()
+
         # 启动VMOS应用
-        result = start_app([pad_code], pkg_name=Config.PKG_NAME)
+        result = start_app([pad_code], pkg_name=pkg_names['pkg_name'])
         logger.success(f"{pad_code}: 启动成功, {result}")
 
         # 更新数据库中的运行状态
@@ -525,3 +549,12 @@ def update_phone_number():
             'phone_number': phone_number
         }), 200
     return jsonify({'error': 'Config not found'}), 404
+
+
+def get_current_api_token():
+    """动态获取当前的API令牌"""
+    try:
+        return get_dynamic_config('API_SECRET_TOKEN')
+    except ImportError:
+        from app import Config
+        return Config.API_SECRET_TOKEN

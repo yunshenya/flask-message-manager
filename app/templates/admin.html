@@ -250,7 +250,9 @@
 
             <div class="form-group">
                 <label>描述:</label>
-                <input id="editMachineDesc" type="text">
+                <label for="editMachineDesc">
+                    <input id="editMachineDesc" type="text">
+                </label>
             </div>
 
             <!-- 多消息编辑区域 -->
@@ -283,7 +285,9 @@
 
             <div class="form-group">
                 <label>重置时间 (小时):</label>
-                <input id="editResetTime" min="0" type="number">
+                <label for="editResetTime">
+                    <input id="editResetTime" min="0" type="number">
+                </label>
             </div>
 
             <div class="form-group">
@@ -328,7 +332,6 @@
         <div style="background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; padding: 1rem; margin-bottom: 1rem;">
             <h4 style="margin: 0 0 0.5rem 0; color: #1976d2;">⚠️ 重要提示</h4>
             <ul style="margin: 0; color: #1976d2; font-size: 0.9rem;">
-                <li>修改配置后需要重启应用才能生效</li>
                 <li>敏感信息（如密钥、密码）在界面中会被隐藏</li>
                 <li>建议在修改前先导出备份</li>
                 <li>数据库和API相关配置请谨慎修改</li>

@@ -1,5 +1,4 @@
 import os
-
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -23,3 +22,25 @@ class Config:
     success_time_min = os.getenv('SUCCESS_TIME_MIN')
     success_time_max = os.getenv('SUCCESS_TIME_MAX')
     reset_time = os.getenv('RESET_TIME')
+
+    @classmethod
+    def get_dynamic_config(cls, key: str, default=None):
+        """获取动态配置，优先从动态配置管理器获取"""
+        try:
+            from app.utils.dynamic_config import get_dynamic_config
+            return get_dynamic_config(key, default)
+        except ImportError:
+            # 降级到静态配置
+            return getattr(cls, key, default)
+
+    @classmethod
+    def update_dynamic_config(cls, key: str, value):
+        """更新动态配置"""
+        try:
+            from app.utils.dynamic_config import set_dynamic_config
+            set_dynamic_config(key, value)
+            # 同时更新类属性（向后兼容）
+            setattr(cls, key, value)
+        except ImportError:
+            # 降级到静态配置
+            setattr(cls, key, value)

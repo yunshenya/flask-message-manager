@@ -52,6 +52,7 @@ async function saveEditedMachine(event) {
         });
 
         showSuccess('更新成功', '机器配置已成功更新');
+        console.log(result);
         hideEditMachineModal();
         await loadMachines();
     } catch (error) {
@@ -60,7 +61,7 @@ async function saveEditedMachine(event) {
 }
 
 // 标签页切换功能
-function switchTab(tabName) {
+async function switchTab(tabName) {
     // 隐藏所有标签页内容
     const contents = document.querySelectorAll('.tab-content');
     contents.forEach(content => content.classList.remove('active'));
@@ -77,14 +78,11 @@ function switchTab(tabName) {
 
     // 如果切换到机器管理，加载机器列表
     if (tabName === 'machines') {
-        loadMachines().then(r => {
-        });
+        await loadMachines();
     } else if (tabName === 'cleanup') {
-        loadCleanupTasks().then(r => {});
+        await loadCleanupTasks();
     } else if (tabName === 'system-config') {
-        loadSystemConfigs().then(r => {
-            console.log('系统配置已加载');
-        });
+        await loadSystemConfigs();
     }
 }
 
@@ -169,8 +167,7 @@ async function editMachine(machineId) {
         messageField.value = machine.message || '';
 
         // 解析消息为数组
-        const messages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
-        currentMessages = messages;
+        currentMessages = machine.message ? machine.message.split('----').map(msg => msg.trim()).filter(msg => msg) : [];
 
         showEditMachineModal();
     } catch (error) {
@@ -726,6 +723,7 @@ function displaySystemConfigs(configs, categories) {
                 <button class="btn btn-info btn-sm" onclick="syncFromEnvFile()">📥 从.env同步</button>
                 <button class="btn btn-warning btn-sm" onclick="exportToEnvFile()">📤 导出.env</button>
                 <button class="btn btn-danger btn-sm" onclick="backupAndUpdateEnv()">💾 备份并更新.env</button>
+                <button class="btn btn-primary btn-sm" onclick="reloadAllConfigs()">🔄 重新加载所有配置</button>
             </div>
         </div>
     `;
@@ -743,6 +741,9 @@ function displaySystemConfigs(configs, categories) {
                         <span style="font-size: 0.8rem; background: #6c757d; color: white; padding: 0.2rem 0.5rem; border-radius: 12px;">
                             ${configList.length} 项
                         </span>
+                        <span style="font-size: 0.7rem; background: #28a745; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; margin-left: auto;">
+                            实时生效
+                        </span>
                     </h4>
                 </div>
                 <div style="overflow-x: auto;">
@@ -753,7 +754,7 @@ function displaySystemConfigs(configs, categories) {
                                 <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6;">值</th>
                                 <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 250px;">描述</th>
                                 <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 120px;">更新时间</th>
-                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 200px;">操作</th>
+                                <th style="padding: 0.75rem; text-align: left; border-bottom: 1px solid #dee2e6; width: 250px;">操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -779,6 +780,7 @@ function displaySystemConfigs(configs, categories) {
                                         <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
                                             <button class="btn btn-info btn-sm" onclick="editSystemConfig(${config.id})" title="编辑">✏️</button>
                                             ${getTestButton(config.key)}
+                                            <button class="btn btn-success btn-sm" onclick="applyConfigImmediately(${config.id})" title="立即应用" style="background: #28a745;">⚡</button>
                                             <button class="btn btn-danger btn-sm" onclick="deleteSystemConfig(${config.id}, '${config.key.replace(/'/g, '&#39;')}')" title="删除">🗑️</button>
                                         </div>
                                     </td>
@@ -852,17 +854,29 @@ async function saveSystemConfig(event) {
 
     try {
         if (isEdit) {
-            await apiCall(`/api/system-configs/${configId}`, {
+            const result = await apiCall(`/api/system-configs/${configId}`, {
                 method: 'PUT',
                 body: JSON.stringify(data)
             });
-            showSuccess('更新成功', '系统配置已更新');
+
+            let message = result.message;
+            if (result.immediate_effect && result.immediate_effect.effects) {
+                message += '\n\n立即生效的变更：\n' + result.immediate_effect.effects.join('\n');
+            }
+
+            showSuccess('更新成功', message);
+
+            if (result.immediate_effect && result.immediate_effect.warning) {
+                setTimeout(() => {
+                    showWarning('注意', result.immediate_effect.warning);
+                }, 1000);
+            }
         } else {
-            await apiCall('/api/system-configs', {
+            const result = await apiCall('/api/system-configs', {
                 method: 'POST',
                 body: JSON.stringify(data)
             });
-            showSuccess('创建成功', '系统配置已创建');
+            showSuccess('创建成功', result.message);
         }
 
         hideAddSystemConfigModal();
@@ -999,7 +1013,7 @@ function displayInactiveMachines(machines) {
         return;
     }
 
-    const tableHTML = `
+    listDiv.innerHTML = `
         <div style="margin-bottom: 1rem;">
             <h4>未激活的机器 (${actuallyInactiveMachines.length} 台)</h4>
             <p style="color: #666;">以下机器当前处于未激活状态，您可以选择激活它们：</p>
@@ -1058,8 +1072,6 @@ function displayInactiveMachines(machines) {
             </button>
         </div>
     `;
-
-    listDiv.innerHTML = tableHTML;
 }
 
 async function activateMachineWithRemove(machineId, machineName) {
@@ -1493,6 +1505,49 @@ function updateHiddenMessageField() {
     const hiddenField = document.getElementById('editMachineMessage');
     if (hiddenField) {
         hiddenField.value = currentMessages.join('----');
+    }
+}
+
+async function applyConfigImmediately(configId) {
+    if (!await showConfirm('立即应用', '确定要立即应用此配置变更吗？这将使配置立即生效，无需重启应用。', 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall(`/api/system-configs/${configId}/apply-immediate`, {
+            method: 'POST'
+        });
+
+        if (result.success) {
+            showSuccess('应用成功', `配置已立即生效\n${result.effects.join('\n')}`);
+            if (result.warning) {
+                setTimeout(() => {
+                    showWarning('注意', result.warning);
+                }, 1000);
+            }
+        } else {
+            showError('应用失败', result.error || '无法立即应用配置');
+        }
+    } catch (error) {
+        showError('操作失败', '立即应用配置时发生错误');
+    }
+}
+
+// 重新加载所有配置
+async function reloadAllConfigs() {
+    if (!await showConfirm('重新加载', '确定要重新加载所有配置吗？这将从数据库重新加载所有配置到内存中。', 'primary')) {
+        return;
+    }
+
+    try {
+        const result = await apiCall('/api/system-configs/reload-all', {
+            method: 'POST'
+        });
+
+        showSuccess('重新加载成功', result.message);
+        await loadSystemConfigs(); // 刷新配置列表
+    } catch (error) {
+        showError('重新加载失败', '无法重新加载配置');
     }
 }
 

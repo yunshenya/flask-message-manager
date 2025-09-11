@@ -1,6 +1,22 @@
 from app.utils.auth import VmosUtil
 
 
+def get_current_vmos_config():
+    """获取当前的VMOS配置"""
+    try:
+        from app.utils.dynamic_config import get_dynamic_config
+        return {
+            'access_key': get_dynamic_config('ACCESS_KEY'),
+            'secret_access': get_dynamic_config('SECRET_ACCESS')
+        }
+    except ImportError:
+        from app import Config
+        return {
+            'access_key': Config.ACCESS_KEY,
+            'secret_access': Config.SECRET_ACCESS
+        }
+
+
 def replace_pad(pad_code: list[str], template_id: int) -> dict[str, str]:
     pad_infos_url = '/vcpcloud/api/padApi/replacePad'
 
