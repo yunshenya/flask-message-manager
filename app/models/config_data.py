@@ -16,6 +16,7 @@ class ConfigData(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.datetime.now())
     updated_at = db.Column(db.DateTime, default=datetime.datetime.now())
     is_active = db.Column(db.Boolean, default=True)
+    is_running = db.Column(db.Boolean, default=False)
     description = db.Column(db.Text)
     pade_code = db.Column(db.Text)
     name = db.Column(db.Text)
@@ -38,4 +39,5 @@ class ConfigData(db.Model):
             'message': self.message,
             'name': self.name,
             'phone': self.phone_number,
+            'is_running': self.is_running,
         }

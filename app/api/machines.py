@@ -139,11 +139,13 @@ def toggle_machine_status(machine_id):
             return jsonify({'error': 'Machine not found'}), 404
 
         if machine.is_active:
-            pade_code = machine.pade_code
-            result = stop_app([pade_code], package_name=Config.PKG_NAME)
-            logger.success(f"{pade_code}: 停止成功, {result}")
-            result_tg = stop_app([pade_code], package_name=Config.TG_PKG_NAME)
-            logger.success(f"{pade_code}: 停止成功, {result_tg}")
+            if machine.is_running:
+                pade_code = machine.pade_code
+                result = stop_app([pade_code], package_name=Config.PKG_NAME)
+                logger.success(f"{pade_code}: 停止成功, {result}")
+                result_tg = stop_app([pade_code], package_name=Config.TG_PKG_NAME)
+                logger.success(f"{pade_code}: 停止成功, {result_tg}")
+                machine.is_running = False
             machine.is_active = False
             machine.updated_at = datetime.datetime.now()
         else:
@@ -238,6 +240,7 @@ def batch_start_machines():
                         'message': 'Started successfully',
                         'response': response
                     })
+                    machine.is_running = True
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,
@@ -283,6 +286,7 @@ def batch_stop_machines():
                         'message': 'Stopped successfully',
                         'response': response
                     })
+                    machine.is_running = False
                 except Exception as e:
                     results.append({
                         'machine_id': machine.id,

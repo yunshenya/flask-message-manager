@@ -613,7 +613,7 @@ function updateCurrentMachineInfo() {
     const machine = availableMachines.find(m => m.id === currentConfigId);
     if (machine) {
         phoneSpan.textContent = machine.phone || '等待获取中';
-        statusSpan.textContent = machine.is_active ? '激活' : '禁用';
+        statusSpan.textContent = machine.is_running ? '运行中' : '未运行';
         statusSpan.className = `machine-status ${machine.is_active ? 'status-active' : 'status-inactive'}`;
         infoDiv.style.display = 'flex';
         editBtn.style.display = 'inline-block';

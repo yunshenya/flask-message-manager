@@ -89,7 +89,7 @@ def stop():
             for url in urls:
                 if url.stop_running():
                     stopped_urls.append(url.to_dict())
-
+            config.is_running = False
             db.session.commit()
 
             # 推送所有停止的URL事件
@@ -143,7 +143,7 @@ def start():
                 if url.start_running():
                     started_count += 1
                     started_urls.append(url.to_dict())
-
+            config.is_running = True
             db.session.commit()
 
             # 推送所有启动的URL事件
