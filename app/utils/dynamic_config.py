@@ -157,17 +157,17 @@ def set_dynamic_config(key: str, value: Any):
 
 
 # 配置变更回调示例
-def on_debug_change(key: str, old_value: Any, new_value: Any):
+def on_debug_change(old_value: Any, new_value: Any):
     """调试模式变更回调"""
     logger.info(f"调试模式从 {old_value} 变更为 {new_value}")
 
 
-def on_database_change(key: str, old_value: Any, new_value: Any):
+def on_database_change(key: str):
     """数据库配置变更回调"""
     logger.warning(f"数据库配置已变更，建议重启应用以完全生效: {key}")
 
 
-def on_api_key_change(key: str, old_value: Any, new_value: Any):
+def on_api_key_change(key: str):
     """API密钥变更回调"""
     logger.info(f"API密钥已更新: {key}")
 

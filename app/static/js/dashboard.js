@@ -88,8 +88,7 @@ function setupWebSocketEvents() {
     socket.on('url_executed', function (data) {
         if (data.config_id === currentConfigId) {
             updateSingleUrlItem(data.url_data);
-            updateStatsFromSocket().then(r => {
-            });
+            updateStatsFromSocket().then(() => {});
             updateRunningUrlsCache(data.url_data);
         }
     });
@@ -104,10 +103,8 @@ function setupWebSocketEvents() {
     // 监听标签更新
     socket.on('label_updated', function (data) {
         if (data.config_id === currentConfigId) {
-            loadDashboardData().then(r => {
-            });
-            loadLabelStats().then(r => {
-            });
+            loadDashboardData().then(() => {});
+            loadLabelStats().then(() => {});
         }
     });
 
@@ -264,8 +261,7 @@ function initializeRunningUrlsCache(urls) {
 function updateSingleUrlItem(urlData) {
     const urlItem = document.querySelector(`[data-url-id="${urlData.id}"]`);
     if (!urlItem) {
-        loadDashboardData().then(r => {
-        });
+        loadDashboardData().then(() => {});
         return;
     }
 
@@ -493,9 +489,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 
-// 多机器仪表板管理系统
-const API_BASE = '';
-
 async function apiCall(url, options = {}) {
     try {
         const response = await fetch(url, {
@@ -511,7 +504,7 @@ async function apiCall(url, options = {}) {
                 window.location.href = '/auth/login';
                 return;
             }
-            throw new Error(`HTTP ${response.status}`);
+            new Error(`HTTP ${response.status}`);
         }
 
         return await response.json();
@@ -594,8 +587,7 @@ function switchMachine() {
         // 切换机器时清除筛选状态
         clearFilterInternal();
         updateCurrentMachineInfo();
-        loadDashboardData().then(r => {
-        });
+        loadDashboardData().then(() => {});
     }
 }
 
@@ -807,8 +799,7 @@ function clearFilterInternal() {
 
 function clearFilter() {
     clearFilterInternal();
-    loadDashboardData().then(r => {
-    });
+    loadDashboardData().then(() => {});
 }
 
 // ================================
@@ -1118,9 +1109,7 @@ async function stopAllMachines() {
 function showMachineManagement() {
     document.getElementById('machineManagementModal').style.display = 'block';
     // 每次打开都重新加载最新数据
-    loadMachineManagementList().then(r => {
-        console.log('机器管理列表已刷新');
-    });
+    loadMachineManagementList().then(() => {});
 }
 
 function hideMachineManagement() {
@@ -1544,9 +1533,7 @@ let dashboardAvailableConfigs = [];
 
 function showCleanupManagement() {
     document.getElementById('cleanupManagementModal').style.display = 'block';
-    loadDashboardCleanupTasks().then(() => {
-        console.log('清理任务列表已加载');
-    });
+    loadDashboardCleanupTasks().then(() => {});
 }
 
 function hideCleanupManagement() {
@@ -2057,7 +2044,7 @@ document.addEventListener('keydown', function(e) {
     // Ctrl + Shift + I: 显示未激活群聊
     if (e.ctrlKey && e.shiftKey && e.key === 'I') {
         e.preventDefault();
-        showInactiveUrls().then(r => {});
+        showInactiveUrls().then(() => {});
     }
 
     // Ctrl + Shift + A: 切换显示未激活群聊
@@ -3079,7 +3066,7 @@ function updateDeleteStats() {
         totalExecutions: selectedUrls.reduce((sum, url) => sum + url.current_count, 0)
     };
 
-    const statsHtml = `
+    document.getElementById('deleteStatsContent').innerHTML = `
         <h5 style="margin: 0 0 0.5rem 0;">📊 删除统计预览</h5>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; font-size: 0.9rem;">
             <div><strong>总计:</strong> ${stats.total} 个</div>
@@ -3093,8 +3080,6 @@ function updateDeleteStats() {
             <strong>总执行次数:</strong> ${stats.totalExecutions} 次
         </div>
     `;
-
-    document.getElementById('deleteStatsContent').innerHTML = statsHtml;
     document.getElementById('deleteStatsInfo').style.display = 'block';
 }
 
@@ -3250,6 +3235,6 @@ document.addEventListener('keydown', function(e) {
     // Ctrl + Shift + D: 批量删除群聊
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
-        showBatchDeleteUrlModal().then(r => {});
+        showBatchDeleteUrlModal().then(() => {});
     }
 });

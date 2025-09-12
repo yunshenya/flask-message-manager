@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS config_data (
                                             pade_code TEXT,
                                             name TEXT,
                                             description TEXT,
-                                            message varchar(100)
+                                            message TEXT,
+                                            is_running BOOLEAN DEFAULT FALSE
 );
 
 -- 为配置表添加注释
@@ -18,6 +19,7 @@ COMMENT ON COLUMN config_data.success_time_min IS '成功时间范围最小值';
 COMMENT ON COLUMN config_data.success_time_max IS '成功时间范围最大值';
 COMMENT ON COLUMN config_data.reset_time IS '重置时间';
 COMMENT ON COLUMN config_data.is_active IS '配置是否激活';
+COMMENT ON COLUMN config_data.is_running IS '是否正在运行';
 
 -- ================================
 -- URL数据表
