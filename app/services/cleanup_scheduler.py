@@ -42,7 +42,10 @@ def _execute_task(task: CleanupTask):
                             url.current_count = 0
                             url.last_time = None
                             url.stopped_at = None
-                            url.started_at = datetime.datetime.now()
+                            if config.is_running:
+                                url.started_at = datetime.datetime.now()
+                            else:
+                                url.started_at = None
                             url.updated_at = datetime.datetime.now()
                             success_list.append(url.id)
         affected_rows = len(success_list)
