@@ -7,8 +7,8 @@ def main():
     headers = {'token': 'Bearer ' + "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"}
     url = BASE_URL + "/api/update_running_status"
     json = {
-        'url_id': "448",
-        "running_status": False,
+        'url_id': "4114",
+        "running_status": True,
     }
     r = requests.post(url, headers=headers, json=json)
     print(r.json())
