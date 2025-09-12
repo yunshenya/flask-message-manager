@@ -315,3 +315,35 @@ def batch_update_labels():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/update_running_status', methods=['POST'])
+def update_running_status():
+    url_id = request.json.get('url_id')
+    running_status = bool(request.json.get('running_status'))
+    url = UrlData.query.filter(UrlData.id == url_id).one()
+    if not url:
+        return jsonify({
+            'error': f'No URLs found "{url_id}"'
+        })
+    url.is_running = running_status
+    url.updated_at = datetime.datetime.now()
+    db.session.commit()
+    if running_status:
+        socketio.emit('url_started', {
+            'url_id': url_id,
+            'config_id': url.config_id,
+            'url_data': url.to_dict(),
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+    else:
+        socketio.emit('url_stopped', {
+            'url_id': url_id,
+            'config_id': url.config_id,
+            'url_data': url.to_dict(),
+            'timestamp': datetime.datetime.now().isoformat()
+        })
+    return jsonify({
+        'message': f'Successfully update {url_id} running status, turn to {running_status}',
+        'url_id': url_id
+    })
