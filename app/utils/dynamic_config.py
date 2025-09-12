@@ -5,6 +5,44 @@ from flask import current_app
 from loguru import logger
 
 
+def _apply_to_flask_config(key: str, value: Any):
+    """将配置应用到Flask配置中"""
+    try:
+        # 更新Flask配置
+        current_app.config[key] = value
+
+        # 特殊配置的处理
+        if key == 'DEBUG':
+            current_app.debug = bool(value)
+            logger.info(f"Flask调试模式已{'启用' if value else '禁用'}")
+
+    except Exception as e:
+        logger.warning(f"应用配置到Flask失败 {key}: {e}")
+
+
+def _convert_value(value: str) -> Any:
+    """转换配置值到适当的类型"""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value_lower = value.lower()
+        # 布尔值转换
+        if value_lower in ('true', 'false'):
+            return value_lower == 'true'
+        # 数字转换
+        if value.isdigit():
+            return int(value)
+        # 小数转换
+        try:
+            if '.' in value:
+                return float(value)
+        except ValueError:
+            pass
+
+    return value
+
+
 class DynamicConfigManager:
     """动态配置管理器 - 支持运行时修改配置"""
 
@@ -38,7 +76,7 @@ class DynamicConfigManager:
                 from app.models.system_config import SystemConfig
                 config = SystemConfig.query.filter_by(key=key).first()
                 if config:
-                    value = self._convert_value(config.value)
+                    value = _convert_value(config.value)
                     self._config_cache[key] = value
                     return value
                 else:
@@ -58,11 +96,11 @@ class DynamicConfigManager:
             old_value = self._config_cache.get(key)
 
             # 转换并存储到缓存
-            converted_value = self._convert_value(value)
+            converted_value = _convert_value(value)
             self._config_cache[key] = converted_value
 
             # 应用到Flask配置（如果适用）
-            self._apply_to_flask_config(key, converted_value)
+            _apply_to_flask_config(key, converted_value)
 
             # 通知监听器
             if notify_watchers and key in self._watchers:
@@ -102,42 +140,6 @@ class DynamicConfigManager:
                 self._watchers[key].remove(callback)
                 if not self._watchers[key]:
                     del self._watchers[key]
-
-    def _convert_value(self, value: str) -> Any:
-        """转换配置值到适当的类型"""
-        if value is None:
-            return None
-
-        if isinstance(value, str):
-            value_lower = value.lower()
-            # 布尔值转换
-            if value_lower in ('true', 'false'):
-                return value_lower == 'true'
-            # 数字转换
-            if value.isdigit():
-                return int(value)
-            # 小数转换
-            try:
-                if '.' in value:
-                    return float(value)
-            except ValueError:
-                pass
-
-        return value
-
-    def _apply_to_flask_config(self, key: str, value: Any):
-        """将配置应用到Flask配置中"""
-        try:
-            # 更新Flask配置
-            current_app.config[key] = value
-
-            # 特殊配置的处理
-            if key == 'DEBUG':
-                current_app.debug = bool(value)
-                logger.info(f"Flask调试模式已{'启用' if value else '禁用'}")
-
-        except Exception as e:
-            logger.warning(f"应用配置到Flask失败 {key}: {e}")
 
 
 # 全局实例
