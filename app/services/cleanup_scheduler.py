@@ -25,6 +25,7 @@ def _execute_task(task: CleanupTask):
                         config: ConfigData = ConfigData.query.filter(ConfigData.id == config_id).one()
                         for url in config.urls:
                             url.status = ''
+                            url.is_running = config.is_running
                             url.updated_at = datetime.datetime.now()
                             success_list.append(url.id)
                 case "label":
@@ -40,6 +41,8 @@ def _execute_task(task: CleanupTask):
                         for url in config.urls:
                             url.current_count = 0
                             url.last_time = None
+                            url.stopped_at = None
+                            url.started_at = datetime.datetime.now()
                             url.updated_at = datetime.datetime.now()
                             success_list.append(url.id)
         affected_rows = len(success_list)

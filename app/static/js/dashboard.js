@@ -113,6 +113,12 @@ function setupWebSocketEvents() {
         if (data.config_id === currentConfigId) {
             updateRunningUrlsCache(data.url_data);
             updateSingleUrlItem(data.url_data);
+            startDurationUpdates();
+            // 强制刷新确保状态同步
+            loadDashboardData().then(() => {
+            }).catch(error => {
+                console.error('状态同步失败:', error);
+            });
         }
     });
 
@@ -121,6 +127,12 @@ function setupWebSocketEvents() {
         if (data.config_id === currentConfigId) {
             removeFromRunningUrlsCache(data.url_id);
             updateSingleUrlItem(data.url_data);
+            startDurationUpdates();
+            // 强制刷新确保状态同步
+            loadDashboardData().then(() => {
+            }).catch(error => {
+                console.error('状态同步失败:', error);
+            });
         }
     });
 
