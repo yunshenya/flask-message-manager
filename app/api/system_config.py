@@ -2,6 +2,7 @@ import os
 import datetime
 import shutil
 from flask import jsonify, request
+from loguru import logger
 
 from app import db
 from app.api import bp
@@ -86,7 +87,7 @@ def update_system_config(config_id):
 
 def apply_immediate_effect(key: str, new_value, old_value) -> dict:
     """应用配置的立即生效"""
-    result = {'success': True, 'effects': []}
+    result = {'success': True, 'effects': [old_value]}
 
     try:
         # 更新Flask配置
@@ -117,7 +118,7 @@ def apply_immediate_effect(key: str, new_value, old_value) -> dict:
 
         elif key == 'DATABASE_URL':
             result['effects'].append('数据库URL已更新到配置，但建议重启应用以完全生效')
-            result['warning'] = '数据库配置变更建议重启应用'
+            result['warning'] = ['数据库配置变更建议重启应用']
 
         elif key.startswith('SUCCESS_TIME_') or key == 'RESET_TIME':
             result['effects'].append('时间配置已更新，新创建的机器将使用新设置')
@@ -127,7 +128,7 @@ def apply_immediate_effect(key: str, new_value, old_value) -> dict:
 
     except Exception as e:
         result['success'] = False
-        result['error'] = str(e)
+        result['error'] = [str(e)]
 
     return result
 
@@ -189,7 +190,7 @@ def create_system_config():
             from app.utils.dynamic_config import dynamic_config
             dynamic_config.set_config(config.key, config.value)
         except Exception as e:
-            pass  # 新配置立即生效失败不影响创建
+            logger.error(e)
 
         return jsonify({
             'message': f'配置 {config.key} 已创建并立即生效',
@@ -218,8 +219,8 @@ def delete_system_config(config_id):
         try:
             from app.utils.dynamic_config import dynamic_config
             dynamic_config.reload_config(config_key)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(e)
 
         return jsonify({
             'message': f'配置 {config_key} 已删除'
@@ -319,8 +320,8 @@ def sync_from_env():
                             try:
                                 from app.utils.dynamic_config import dynamic_config
                                 dynamic_config.set_config(key, value)
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.error(e)
                     else:
                         # 根据key推断配置分类和敏感性
                         category = 'general'
@@ -338,7 +339,7 @@ def sync_from_env():
                             category = 'vmos'
                             is_sensitive = True
 
-                        config = SystemConfig.set_config(
+                        SystemConfig.set_config(
                             key=key,
                             value=value,
                             description=f'从.env文件同步 (行 {line_num})',
@@ -351,8 +352,8 @@ def sync_from_env():
                         try:
                             from app.utils.dynamic_config import dynamic_config
                             dynamic_config.set_config(key, value)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.error(e)
 
         db.session.commit()
 

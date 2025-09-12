@@ -7,8 +7,25 @@ from loguru import logger
 from app import db, Config, socketio
 from app.api import bp
 from app.auth.decorators import login_required, admin_required
+from app.models import UrlData
 from app.models.config_data import ConfigData
 from app.utils.vmos import get_phone_list, start_app, stop_app
+
+
+def get_current_pkg_names():
+    """动态获取当前的包名配置"""
+    try:
+        from app.utils.dynamic_config import get_dynamic_config
+        return {
+            'pkg_name': get_dynamic_config('PKG_NAME'),
+            'tg_pkg_name': get_dynamic_config('TG_PKG_NAME')
+        }
+    except ImportError:
+        from app import Config
+        return {
+            'pkg_name': Config.PKG_NAME,
+            'tg_pkg_name': Config.TG_PKG_NAME
+        }
 
 
 @bp.route('/machines', methods=['GET'])
@@ -20,6 +37,121 @@ def get_machines():
         return jsonify([machine.to_dict() for machine in machines])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route("/stop", methods=["post"])
+@login_required
+def stop():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "请提供 JSON 数据"}), 400
+    pad_code: str = data.get("pade_code")
+    if not pad_code:
+        return jsonify({"error": "padcode 参数缺失"}), 400
+
+    try:
+        # 动态获取包名配置
+        pkg_names = get_current_pkg_names()
+
+        # 停止VMOS应用
+        result = stop_app([pad_code], package_name=pkg_names['pkg_name'])
+        logger.success(f"{pad_code}: 停止成功, {result}")
+        result_tg = stop_app([pad_code], package_name=pkg_names['tg_pkg_name'])
+        logger.success(f"{pad_code}: 停止成功, {result_tg}")
+
+        # 更新数据库中的运行状态
+        config = ConfigData.query.filter_by(pade_code=pad_code).first()
+        if config:
+            # 停止该配置下所有URL的运行状态
+            urls = UrlData.query.filter_by(config_id=config.id, is_running=True).all()
+            stopped_urls = []
+            for url in urls:
+                if url.stop_running():
+                    stopped_urls.append(url.to_dict())
+            config.is_running = False
+            db.session.commit()
+            socketio.emit('machine_info_update', {
+                'machine_id': config.id,
+                'is_running': False,
+                'phone_number': config.phone_number
+            })
+
+            # 推送所有停止的URL事件
+            for url_data in stopped_urls:
+                socketio.emit('url_stopped', {
+                    'url_id': url_data['id'],
+                    'config_id': config.id,
+                    'url_data': url_data,
+                    'timestamp': datetime.datetime.now().isoformat()
+                })
+
+            logger.info(f"已停止配置 {config.id} 下 {len(urls)} 个URL的运行状态")
+
+        return jsonify({"message": "停止成功", "msg": result})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"停止失败: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/start", methods=["post"])
+@login_required
+def start():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "请提供 JSON 数据"}), 400
+    pad_code: str = data.get("pade_code")
+    if not pad_code:
+        return jsonify({"error": "padcode 参数缺失"}), 400
+
+    try:
+        # 动态获取包名配置
+        pkg_names = get_current_pkg_names()
+
+        # 启动VMOS应用
+        result = start_app([pad_code], pkg_name=pkg_names['pkg_name'])
+        logger.success(f"{pad_code}: 启动成功, {result}")
+
+        # 更新数据库中的运行状态
+        config = ConfigData.query.filter_by(pade_code=pad_code).first()
+        if config:
+            # 启动该配置下所有可用URL的运行状态
+            urls = UrlData.query.filter_by(
+                config_id=config.id,
+                is_active=True
+            ).filter(UrlData.current_count < UrlData.max_num).all()
+
+            started_count = 0
+            started_urls = []
+            for url in urls:
+                if url.start_running():
+                    started_count += 1
+                    started_urls.append(url.to_dict())
+            config.is_running = True
+            db.session.commit()
+
+            socketio.emit('machine_info_update', {
+                'machine_id': config.id,
+                'is_running': True,
+                'phone_number': config.phone_number
+            })
+
+            # 推送所有启动的URL事件
+            for url_data in started_urls:
+                socketio.emit('url_started', {
+                    'url_id': url_data['id'],
+                    'config_id': config.id,
+                    'url_data': url_data,
+                    'timestamp': datetime.datetime.now().isoformat()
+                })
+
+            logger.info(f"已启动配置 {config.id} 下 {started_count} 个URL的运行状态")
+
+        return jsonify({"message": "启动成功", "msg": result})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"启动失败: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @bp.route('/machines', methods=['POST'])

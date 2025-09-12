@@ -1,6 +1,8 @@
+import datetime
+
 from flask import jsonify, request
 
-from app import db
+from app import db, socketio
 from app.api import bp
 from app.auth.decorators import login_required, token_required
 from app.models.config_data import ConfigData
@@ -192,6 +194,120 @@ def get_config_running_status(config_id):
                 'completed_urls': completed_urls,
                 'pending_urls': pending_urls
             }
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route("/config/<int:config_id>/start-urls", methods=["POST"])
+@login_required
+def start_config_urls(config_id):
+    """启动配置下的所有可用URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(
+            config_id=config_id,
+            is_active=True
+        ).filter(UrlData.current_count < UrlData.max_num).all()
+
+        started_count = 0
+        started_urls = []
+        for url in urls:
+            if url.start_running():
+                started_count += 1
+                started_urls.append(url.to_dict())
+
+        db.session.commit()
+
+        # 批量推送启动事件
+        for url_data in started_urls:
+            socketio.emit('url_started', {
+                'url_id': url_data['id'],
+                'config_id': config_id,
+                'url_data': url_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
+        return jsonify({
+            'message': f'Started {started_count} URLs successfully',
+            'total_available': len(urls),
+            'started': started_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route("/config/<int:config_id>/stop-urls", methods=["POST"])
+@login_required
+def stop_config_urls(config_id):
+    """停止配置下的所有运行中的URL"""
+    try:
+        config = db.session.get(ConfigData, config_id)
+        if not config:
+            return jsonify({'error': 'Config not found'}), 404
+
+        urls = UrlData.query.filter_by(config_id=config_id, is_running=True).all()
+
+        stopped_count = 0
+        stopped_urls = []
+        for url in urls:
+            if url.stop_running():
+                stopped_count += 1
+                stopped_urls.append(url.to_dict())
+
+        db.session.commit()
+
+        # 批量推送停止事件
+        for url_data in stopped_urls:
+            socketio.emit('url_stopped', {
+                'url_id': url_data['id'],
+                'config_id': config_id,
+                'url_data': url_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
+        return jsonify({
+            'message': f'Stopped {stopped_count} URLs successfully',
+            'total_running': len(urls),
+            'stopped': stopped_count
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+
+@bp.route("/config/<int:config_id>/running-durations", methods=["GET"])
+@login_required
+def get_running_durations(config_id):
+    """获取配置下所有运行中URL的时长"""
+    try:
+        running_urls = UrlData.query.filter_by(
+            config_id=config_id,
+            is_running=True
+        ).all()
+
+        durations = []
+        for url in running_urls:
+            durations.append({
+                'url_id': url.id,
+                'name': url.name,
+                'started_at': url.started_at.isoformat() if url.started_at else None,
+                'running_duration': url.get_running_duration()
+            })
+
+        return jsonify({
+            'config_id': config_id,
+            'running_urls_count': len(durations),
+            'durations': durations,
+            'total_running_time': sum(d['running_duration'] for d in durations)
         })
 
     except Exception as e:

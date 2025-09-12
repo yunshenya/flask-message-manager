@@ -69,9 +69,9 @@ class UrlData(db.Model):
         """开始运行状态"""
         if self.can_execute() and self.is_active:
             self.is_running = True
-            self.started_at = datetime.datetime.now()
-            self.stopped_at = None
-            self.updated_at = datetime.datetime.now()
+            if self.stopped_at is None:
+                self.started_at = datetime.datetime.now()
+                self.updated_at = datetime.datetime.now()
             return True
         return False
 

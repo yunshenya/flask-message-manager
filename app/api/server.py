@@ -5,27 +5,9 @@ from loguru import logger
 
 from app import db, socketio
 from app.api import bp
-from app.auth.decorators import login_required, token_required
+from app.auth.decorators import token_required
 from app.models import UrlData, ConfigData
 from app.utils.dynamic_config import get_dynamic_config
-from app.utils.vmos import stop_app, start_app
-
-
-def get_current_pkg_names():
-    """动态获取当前的包名配置"""
-    try:
-        from app.utils.dynamic_config import get_dynamic_config
-        return {
-            'pkg_name': get_dynamic_config('PKG_NAME'),
-            'tg_pkg_name': get_dynamic_config('TG_PKG_NAME')
-        }
-    except ImportError:
-        from app import Config
-        return {
-            'pkg_name': Config.PKG_NAME,
-            'tg_pkg_name': Config.TG_PKG_NAME
-        }
-
 
 
 @bp.route("/callback", methods=["POST"])
@@ -59,120 +41,6 @@ def callback():
 
     return "ok"
 
-
-@bp.route("/stop", methods=["post"])
-@login_required
-def stop():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "请提供 JSON 数据"}), 400
-    pad_code: str = data.get("pade_code")
-    if not pad_code:
-        return jsonify({"error": "padcode 参数缺失"}), 400
-
-    try:
-        # 动态获取包名配置
-        pkg_names = get_current_pkg_names()
-
-        # 停止VMOS应用
-        result = stop_app([pad_code], package_name=pkg_names['pkg_name'])
-        logger.success(f"{pad_code}: 停止成功, {result}")
-        result_tg = stop_app([pad_code], package_name=pkg_names['tg_pkg_name'])
-        logger.success(f"{pad_code}: 停止成功, {result_tg}")
-
-        # 更新数据库中的运行状态
-        config = ConfigData.query.filter_by(pade_code=pad_code).first()
-        if config:
-            # 停止该配置下所有URL的运行状态
-            urls = UrlData.query.filter_by(config_id=config.id, is_running=True).all()
-            stopped_urls = []
-            for url in urls:
-                if url.stop_running():
-                    stopped_urls.append(url.to_dict())
-            config.is_running = False
-            db.session.commit()
-            socketio.emit('machine_info_update', {
-                'machine_id': config.id,
-                'is_running': False,
-                'phone_number': config.phone_number
-            })
-
-            # 推送所有停止的URL事件
-            for url_data in stopped_urls:
-                socketio.emit('url_stopped', {
-                    'url_id': url_data['id'],
-                    'config_id': config.id,
-                    'url_data': url_data,
-                    'timestamp': datetime.datetime.now().isoformat()
-                })
-
-            logger.info(f"已停止配置 {config.id} 下 {len(urls)} 个URL的运行状态")
-
-        return jsonify({"message": "停止成功", "msg": result})
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"停止失败: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/start", methods=["post"])
-@login_required
-def start():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "请提供 JSON 数据"}), 400
-    pad_code: str = data.get("pade_code")
-    if not pad_code:
-        return jsonify({"error": "padcode 参数缺失"}), 400
-
-    try:
-        # 动态获取包名配置
-        pkg_names = get_current_pkg_names()
-
-        # 启动VMOS应用
-        result = start_app([pad_code], pkg_name=pkg_names['pkg_name'])
-        logger.success(f"{pad_code}: 启动成功, {result}")
-
-        # 更新数据库中的运行状态
-        config = ConfigData.query.filter_by(pade_code=pad_code).first()
-        if config:
-            # 启动该配置下所有可用URL的运行状态
-            urls = UrlData.query.filter_by(
-                config_id=config.id,
-                is_active=True
-            ).filter(UrlData.current_count < UrlData.max_num).all()
-
-            started_count = 0
-            started_urls = []
-            for url in urls:
-                if url.start_running():
-                    started_count += 1
-                    started_urls.append(url.to_dict())
-            config.is_running = True
-            db.session.commit()
-
-            socketio.emit('machine_info_update', {
-                'machine_id': config.id,
-                'is_running': True,
-                'phone_number': config.phone_number
-            })
-
-            # 推送所有启动的URL事件
-            for url_data in started_urls:
-                socketio.emit('url_started', {
-                    'url_id': url_data['id'],
-                    'config_id': config.id,
-                    'url_data': url_data,
-                    'timestamp': datetime.datetime.now().isoformat()
-                })
-
-            logger.info(f"已启动配置 {config.id} 下 {started_count} 个URL的运行状态")
-
-        return jsonify({"message": "启动成功", "msg": result})
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"启动失败: {e}")
-        return jsonify({"error": str(e)}), 500
 
 
 @bp.route("/add_execute_num", methods=["POST"])
@@ -226,163 +94,6 @@ def add_execute_num():
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-
-@bp.route("/url/<int:url_id>/start", methods=["POST"])
-@login_required
-def start_url(url_id):
-    """启动单个URL"""
-    try:
-        url = db.session.get(UrlData, url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
-
-        if url.start_running():
-            db.session.commit()
-
-            # 添加 WebSocket 推送
-            socketio.emit('url_started', {
-                'url_id': url_id,
-                'config_id': url.config_id,
-                'url_data': url.to_dict(),
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-
-            return jsonify({
-                'message': f'URL "{url.name}" started successfully',
-                'url_data': url.to_dict()
-            })
-        else:
-            return jsonify({
-                'error': 'Cannot start URL - either inactive or already completed'
-            }), 400
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route("/url/<int:url_id>/stop", methods=["POST"])
-@login_required
-def stop_url(url_id):
-    """停止单个URL"""
-    try:
-        url = db.session.get(UrlData, url_id)
-        if not url:
-            return jsonify({'error': 'URL not found'}), 404
-
-        # 如果URL已经停止，直接返回成功
-        if not url.is_running:
-            return jsonify({
-                'message': f'URL "{url.name}" already stopped',
-                'url_data': url.to_dict()
-            })
-
-        if url.stop_running():
-            db.session.commit()
-
-            # WebSocket 推送
-            socketio.emit('url_stopped', {
-                'url_id': url_id,
-                'config_id': url.config_id,
-                'url_data': url.to_dict(),
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-
-            return jsonify({
-                'message': f'URL "{url.name}" stopped successfully',
-                'url_data': url.to_dict()
-            })
-        else:
-            return jsonify({
-                'error': 'Failed to stop URL'
-            }), 500
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route("/config/<int:config_id>/start-urls", methods=["POST"])
-@login_required
-def start_config_urls(config_id):
-    """启动配置下的所有可用URL"""
-    try:
-        config = db.session.get(ConfigData, config_id)
-        if not config:
-            return jsonify({'error': 'Config not found'}), 404
-
-        urls = UrlData.query.filter_by(
-            config_id=config_id,
-            is_active=True
-        ).filter(UrlData.current_count < UrlData.max_num).all()
-
-        started_count = 0
-        started_urls = []
-        for url in urls:
-            if url.start_running():
-                started_count += 1
-                started_urls.append(url.to_dict())
-
-        db.session.commit()
-
-        # 批量推送启动事件
-        for url_data in started_urls:
-            socketio.emit('url_started', {
-                'url_id': url_data['id'],
-                'config_id': config_id,
-                'url_data': url_data,
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-
-        return jsonify({
-            'message': f'Started {started_count} URLs successfully',
-            'total_available': len(urls),
-            'started': started_count
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route("/config/<int:config_id>/stop-urls", methods=["POST"])
-@login_required
-def stop_config_urls(config_id):
-    """停止配置下的所有运行中的URL"""
-    try:
-        config = db.session.get(ConfigData, config_id)
-        if not config:
-            return jsonify({'error': 'Config not found'}), 404
-
-        urls = UrlData.query.filter_by(config_id=config_id, is_running=True).all()
-
-        stopped_count = 0
-        stopped_urls = []
-        for url in urls:
-            if url.stop_running():
-                stopped_count += 1
-                stopped_urls.append(url.to_dict())
-
-        db.session.commit()
-
-        # 批量推送停止事件
-        for url_data in stopped_urls:
-            socketio.emit('url_stopped', {
-                'url_id': url_data['id'],
-                'config_id': config_id,
-                'url_data': url_data,
-                'timestamp': datetime.datetime.now().isoformat()
-            })
-
-        return jsonify({
-            'message': f'Stopped {stopped_count} URLs successfully',
-            'total_running': len(urls),
-            'stopped': stopped_count
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
 
 
 @bp.route("/add_label", methods=["POST"])
@@ -488,35 +199,6 @@ def delete_label_token():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route("/config/<int:config_id>/running-durations", methods=["GET"])
-@login_required
-def get_running_durations(config_id):
-    """获取配置下所有运行中URL的时长"""
-    try:
-        running_urls = UrlData.query.filter_by(
-            config_id=config_id,
-            is_running=True
-        ).all()
-
-        durations = []
-        for url in running_urls:
-            durations.append({
-                'url_id': url.id,
-                'name': url.name,
-                'started_at': url.started_at.isoformat() if url.started_at else None,
-                'running_duration': url.get_running_duration()
-            })
-
-        return jsonify({
-            'config_id': config_id,
-            'running_urls_count': len(durations),
-            'durations': durations,
-            'total_running_time': sum(d['running_duration'] for d in durations)
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 @bp.route("/update_last_time", methods=["POST"])
 @token_required
@@ -572,3 +254,64 @@ def get_current_api_token():
     except ImportError:
         from app import Config
         return Config.API_SECRET_TOKEN
+
+
+
+@bp.route('/batch-update-label', methods=['POST'])
+@token_required
+def batch_update_labels():
+    """批量更新URL标签"""
+    try:
+        data = request.json
+        if not data or 'updates' not in data:
+            return jsonify({'error': 'Missing updates data'}), 400
+
+        updates = data['updates']
+
+        updated_count = 0
+        results = []
+
+        for update in updates:
+            if 'url_id' not in update or 'label' not in update:
+                results.append({
+                    'url_id': update.get('url_id', 'unknown'),
+                    'status': 'error',
+                    'message': 'Missing url_id or label'
+                })
+                continue
+
+            url_id = int(update['url_id'])
+            label = update['label']
+
+            url = db.session.get(UrlData, url_id)
+            if not url:
+                results.append({
+                    'url_id': url_id,
+                    'status': 'error',
+                    'message': 'URL not found'
+                })
+                continue
+
+            url.label = label
+            url.updated_at = datetime.datetime.now()
+            updated_count += 1
+
+            results.append({
+                'url_id': url_id,
+                'status': 'success',
+                'message': f'Label updated to "{label}"',
+                'url_name': url.name
+            })
+
+        db.session.commit()
+
+        return jsonify({
+            'message': f'Batch update completed: {updated_count} URLs updated',
+            'updated_count': updated_count,
+            'total_requests': len(updates),
+            'results': results
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

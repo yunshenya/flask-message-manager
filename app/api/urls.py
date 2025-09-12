@@ -2,9 +2,9 @@ import datetime
 
 from flask import jsonify, request
 
-from app import db
+from app import db, socketio
 from app.api import bp
-from app.auth.decorators import login_required, token_required
+from app.auth.decorators import login_required
 from app.models.config_data import ConfigData
 from app.models.url_data import UrlData
 
@@ -162,6 +162,7 @@ def reset_url_count(url_id):
 
         url.current_count = 0
         url.last_time = None
+        url.stopped_at = None
         url.updated_at = datetime.datetime.now()
         db.session.commit()
 
@@ -258,65 +259,6 @@ def get_all_labels():
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/urls/batch-update-label', methods=['POST'])
-@token_required  # 只有后端系统可以调用
-def batch_update_labels():
-    """批量更新URL标签"""
-    try:
-        data = request.json
-        if not data or 'updates' not in data:
-            return jsonify({'error': 'Missing updates data'}), 400
-
-        updates = data['updates']
-
-        updated_count = 0
-        results = []
-
-        for update in updates:
-            if 'url_id' not in update or 'label' not in update:
-                results.append({
-                    'url_id': update.get('url_id', 'unknown'),
-                    'status': 'error',
-                    'message': 'Missing url_id or label'
-                })
-                continue
-
-            url_id = int(update['url_id'])
-            label = update['label']
-
-            url = db.session.get(UrlData, url_id)
-            if not url:
-                results.append({
-                    'url_id': url_id,
-                    'status': 'error',
-                    'message': 'URL not found'
-                })
-                continue
-
-            url.label = label
-            url.updated_at = datetime.datetime.now()
-            updated_count += 1
-
-            results.append({
-                'url_id': url_id,
-                'status': 'success',
-                'message': f'Label updated to "{label}"',
-                'url_name': url.name
-            })
-
-        db.session.commit()
-
-        return jsonify({
-            'message': f'Batch update completed: {updated_count} URLs updated',
-            'updated_count': updated_count,
-            'total_requests': len(updates),
-            'results': results
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
 
 @bp.route('/urls/labels/<string:label>', methods=['DELETE'])
 @login_required
@@ -403,6 +345,81 @@ def activate_url(url_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+@bp.route("/url/<int:url_id>/start", methods=["POST"])
+@login_required
+def start_url(url_id):
+    """启动单个URL"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        if url.start_running():
+            db.session.commit()
+
+            # 添加 WebSocket 推送
+            socketio.emit('url_started', {
+                'url_id': url_id,
+                'config_id': url.config_id,
+                'url_data': url.to_dict(),
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
+            return jsonify({
+                'message': f'URL "{url.name}" started successfully',
+                'url_data': url.to_dict()
+            })
+        else:
+            return jsonify({
+                'error': 'Cannot start URL - either inactive or already completed'
+            }), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route("/url/<int:url_id>/stop", methods=["POST"])
+@login_required
+def stop_url(url_id):
+    """停止单个URL"""
+    try:
+        url = db.session.get(UrlData, url_id)
+        if not url:
+            return jsonify({'error': 'URL not found'}), 404
+
+        # 如果URL已经停止，直接返回成功
+        if not url.is_running:
+            return jsonify({
+                'message': f'URL "{url.name}" already stopped',
+                'url_data': url.to_dict()
+            })
+
+        if url.stop_running():
+            db.session.commit()
+
+            # WebSocket 推送
+            socketio.emit('url_stopped', {
+                'url_id': url_id,
+                'config_id': url.config_id,
+                'url_data': url.to_dict(),
+                'timestamp': datetime.datetime.now().isoformat()
+            })
+
+            return jsonify({
+                'message': f'URL "{url.name}" stopped successfully',
+                'url_data': url.to_dict()
+            })
+        else:
+            return jsonify({
+                'error': 'Failed to stop URL'
+            }), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 
 
 @bp.route('/config/<int:config_id>/urls/inactive', methods=['GET'])
