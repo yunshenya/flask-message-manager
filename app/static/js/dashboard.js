@@ -10,60 +10,41 @@ let totalUrls = 0;
 
 
 document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // 显示loading
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        initWebSocket();
-        await loadMachineList();
-        if (currentConfigId) {
-            await loadBasicDashboardData();
-        }
-        if (loadingOverlay) {
-            loadingOverlay.style.display = 'none';
-        }
+    // 首先初始化 WebSocket
+    initWebSocket();
 
-        setTimeout(() => {
-            loadDetailedData();
-        }, 100);
+    await loadMachineList();
 
-    } catch (error) {
-        console.error('初始化失败:', error);
-        document.getElementById('loadingOverlay').style.display = 'none';
-        showError('初始化失败', '页面加载出现问题，请刷新重试');
+    if (currentConfigId) {
+        await loadDashboardData();
     }
+
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            // 页面隐藏时停止更新
+            stopDurationUpdates();
+        } else {
+            // 页面显示时恢复更新并强制刷新
+            if (isWebSocketConnected && currentConfigId) {
+                startDurationUpdates();
+                // 强制刷新确保状态同步
+                loadDashboardData().then(() => {
+                }).catch(error => {
+                    console.error('状态同步失败:', error);
+                });
+            } else if (currentConfigId) {
+                loadDashboardData().then(() => {
+                });
+            }
+        }
+    });
 });
-
-// 拆分数据加载
-async function loadBasicDashboardData() {
-    if (!currentConfigId) return;
-
-    try {
-        // 只加载核心统计
-        const statusData = await apiCall(`/api/config/${currentConfigId}/status`);
-        updateStatistics(statusData);
-        updateCurrentMachineInfo();
-    } catch (error) {
-        console.error('加载基础数据失败:', error);
-    }
-}
-
-async function loadDetailedData() {
-    try {
-        // 延迟加载详细数据
-        await Promise.all([
-            loadDashboardData(),
-            loadLabelStats()
-        ]);
-    } catch (error) {
-        console.error('加载详细数据失败:', error);
-    }
-}
 
 // WebSocket 初始化函数
 function initWebSocket() {
     if (typeof io === 'undefined') {
-        showError('连接错误', 'Socket.IO 库加载失败，使用轮询模式');
-        startPollingMode();
+        showError('连接错误', 'Socket.IO 库加载失败，实时更新功能不可用');
         return;
     }
 
@@ -73,16 +54,17 @@ function initWebSocket() {
             socket = null;
         }
 
-        // 优化连接配置
+        // 修改连接配置，解决升级问题
         socket = io('/', {
-            transports: ['websocket', 'polling'],
+            transports: ['polling', 'websocket'],
             upgrade: true,
-            timeout: 5000, // 减少超时时间
-            forceNew: false,
+            timeout: 20000,
+            forceNew: true,
             reconnection: true,
-            reconnectionAttempts: 3, // 减少重连次数
+            reconnectionAttempts: 5,
             reconnectionDelay: 1000,
-            pingTimeout: 30000,
+            maxHttpBufferSize: 1e6,
+            pingTimeout: 60000,
             pingInterval: 25000
         });
 
@@ -90,7 +72,7 @@ function initWebSocket() {
         isWebSocketInitialized = true;
     } catch (error) {
         console.error('WebSocket 初始化失败:', error);
-        startPollingMode(); // 降级到轮询模式
+        showError('连接失败', 'WebSocket 连接初始化失败');
     }
 }
 
