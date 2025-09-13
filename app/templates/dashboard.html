@@ -122,6 +122,17 @@
     </div>
 </div>
 
+<div id="paginationContainer" style="display: none; margin-top: 1rem; text-align: center;">
+    <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div id="paginationInfo" style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;"></div>
+        <div id="paginationControls" style="display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+            <button id="prevPageBtn" class="btn btn-secondary btn-sm" onclick="loadPage(currentPage - 1)" disabled>上一页</button>
+            <span id="pageNumbers" style="display: flex; gap: 0.25rem;"></span>
+            <button id="nextPageBtn" class="btn btn-secondary btn-sm" onclick="loadPage(currentPage + 1)" disabled>下一页</button>
+        </div>
+    </div>
+</div>
+
 <!-- 清理管理模态框 -->
 <div id="cleanupManagementModal"
      style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">

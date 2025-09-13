@@ -3,42 +3,67 @@ let isWebSocketConnected = false;
 let durationUpdateInterval = null;
 let runningUrls = new Map();
 let isWebSocketInitialized = false;
+let currentPage = 1;
+let totalPages = 1;
+let perPage = 5;
+let totalUrls = 0;
+
+
 document.addEventListener('DOMContentLoaded', async () => {
-    // 首先初始化 WebSocket
-    initWebSocket();
-
-    await loadMachineList();
-
-    if (currentConfigId) {
-        await loadDashboardData();
-    }
-
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            // 页面隐藏时停止更新
-            stopDurationUpdates();
-        } else {
-            // 页面显示时恢复更新并强制刷新
-            if (isWebSocketConnected && currentConfigId) {
-                startDurationUpdates();
-                // 强制刷新确保状态同步
-                loadDashboardData().then(() => {
-                }).catch(error => {
-                    console.error('状态同步失败:', error);
-                });
-            } else if (currentConfigId) {
-                loadDashboardData().then(() => {
-                });
-            }
+    try {
+        // 显示loading
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        initWebSocket();
+        await loadMachineList();
+        if (currentConfigId) {
+            await loadBasicDashboardData();
         }
-    });
+        if (loadingOverlay) {
+            loadingOverlay.style.display = 'none';
+        }
+
+        setTimeout(() => {
+            loadDetailedData();
+        }, 100);
+
+    } catch (error) {
+        console.error('初始化失败:', error);
+        document.getElementById('loadingOverlay').style.display = 'none';
+        showError('初始化失败', '页面加载出现问题，请刷新重试');
+    }
 });
+
+// 拆分数据加载
+async function loadBasicDashboardData() {
+    if (!currentConfigId) return;
+
+    try {
+        // 只加载核心统计
+        const statusData = await apiCall(`/api/config/${currentConfigId}/status`);
+        updateStatistics(statusData);
+        updateCurrentMachineInfo();
+    } catch (error) {
+        console.error('加载基础数据失败:', error);
+    }
+}
+
+async function loadDetailedData() {
+    try {
+        // 延迟加载详细数据
+        await Promise.all([
+            loadDashboardData(),
+            loadLabelStats()
+        ]);
+    } catch (error) {
+        console.error('加载详细数据失败:', error);
+    }
+}
 
 // WebSocket 初始化函数
 function initWebSocket() {
     if (typeof io === 'undefined') {
-        showError('连接错误', 'Socket.IO 库加载失败，实时更新功能不可用');
+        showError('连接错误', 'Socket.IO 库加载失败，使用轮询模式');
+        startPollingMode();
         return;
     }
 
@@ -48,17 +73,16 @@ function initWebSocket() {
             socket = null;
         }
 
-        // 修改连接配置，解决升级问题
+        // 优化连接配置
         socket = io('/', {
-            transports: ['polling', 'websocket'],
+            transports: ['websocket', 'polling'],
             upgrade: true,
-            timeout: 20000,
-            forceNew: true,
+            timeout: 5000, // 减少超时时间
+            forceNew: false,
             reconnection: true,
-            reconnectionAttempts: 5,
+            reconnectionAttempts: 3, // 减少重连次数
             reconnectionDelay: 1000,
-            maxHttpBufferSize: 1e6,
-            pingTimeout: 60000,
+            pingTimeout: 30000,
             pingInterval: 25000
         });
 
@@ -66,9 +90,30 @@ function initWebSocket() {
         isWebSocketInitialized = true;
     } catch (error) {
         console.error('WebSocket 初始化失败:', error);
-        showError('连接失败', 'WebSocket 连接初始化失败');
+        startPollingMode(); // 降级到轮询模式
     }
 }
+
+
+function startPollingMode() {
+    setInterval(async () => {
+        if (currentConfigId) {
+            try {
+                await updateStatsFromSocket();
+            } catch (error) {
+                console.error('轮询更新失败:', error);
+            }
+        }
+    }, 5000);
+}
+
+
+function resetToFirstPage() {
+    currentPage = 1;
+    loadPage(1).then(() => {});
+}
+
+
 
 // 设置 WebSocket 事件监听
 function setupWebSocketEvents() {
@@ -355,9 +400,12 @@ async function loadDashboardData() {
     try {
         // 检查是否显示未激活群聊
         const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
+
+        const page = 1; // 首页
+
         const urlsEndpoint = includeInactive
-            ? `/api/config/${currentConfigId}/urls?include_inactive=true`
-            : `/api/config/${currentConfigId}/urls`;
+            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${perPage}`
+            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${perPage}`;
 
         const [statusData, urlsData] = await Promise.all([
             apiCall(`/api/config/${currentConfigId}/status`),
@@ -369,7 +417,7 @@ async function loadDashboardData() {
         // 更新基础统计
         updateStatistics(statusData);
 
-        // 更新URL统计（包含未激活数量）
+        // 🔥 修改：处理分页响应数据
         updateUrlStatistics(urlsData);
 
         // 根据当前筛选状态决定显示哪些URL
@@ -382,6 +430,9 @@ async function loadDashboardData() {
             updateUrlList(urlsData.urls);
             urlsToDisplay = urlsData.urls;
         }
+
+        // 🔥 新增：显示分页信息
+        updatePaginationInfo(urlsData.pagination);
 
         // 初始化运行中URL缓存
         initializeRunningUrlsCache(urlsToDisplay);
@@ -396,6 +447,132 @@ async function loadDashboardData() {
         console.error('加载数据失败:', error);
     }
 }
+
+
+function updatePaginationInfo(pagination) {
+    if (!pagination) {
+        document.getElementById('paginationContainer').style.display = 'none';
+        return;
+    }
+
+    currentPage = pagination.page;
+    totalPages = pagination.pages;
+    perPage = pagination.per_page;
+    totalUrls = pagination.total;
+
+
+    if (totalPages <= 1) {
+        document.getElementById('paginationContainer').style.display = 'none';
+        return;
+    }
+
+    // 显示分页控件
+    document.getElementById('paginationContainer').style.display = 'block';
+
+    // 更新分页信息文字
+    const start = (currentPage - 1) * perPage + 1;
+    const end = Math.min(currentPage * perPage, totalUrls);
+    document.getElementById('paginationInfo').textContent =
+        `显示第 ${start}-${end} 条，共 ${totalUrls} 条群聊`;
+
+    // 更新按钮状态
+    document.getElementById('prevPageBtn').disabled = !pagination.has_prev;
+    document.getElementById('nextPageBtn').disabled = !pagination.has_next;
+
+    // 更新页码按钮
+    updatePageNumbers();
+}
+
+
+function updatePageNumbers() {
+    const pageNumbersContainer = document.getElementById('pageNumbers');
+    pageNumbersContainer.innerHTML = '';
+
+    // 计算显示的页码范围
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+    // 调整起始页
+    if (endPage - startPage + 1 < maxVisible) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    // 如果不是从第1页开始，添加第1页和省略号
+    if (startPage > 1) {
+        addPageButton(1);
+        if (startPage > 2) {
+            pageNumbersContainer.appendChild(createEllipsis());
+        }
+    }
+
+    // 添加页码按钮
+    for (let i = startPage; i <= endPage; i++) {
+        addPageButton(i);
+    }
+
+    // 如果不是到最后一页，添加省略号和最后一页
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            pageNumbersContainer.appendChild(createEllipsis());
+        }
+        addPageButton(totalPages);
+    }
+}
+
+
+function addPageButton(pageNum) {
+    const button = document.createElement('button');
+    button.className = pageNum === currentPage
+        ? 'btn btn-primary btn-sm'
+        : 'btn btn-secondary btn-sm';
+    button.textContent = pageNum;
+    button.onclick = () => loadPage(pageNum);
+    button.style.cssText = 'min-width: 40px; margin: 0 2px;';
+
+    const pageNumbersContainer = document.getElementById('pageNumbers');
+    if (pageNumbersContainer) {
+        pageNumbersContainer.appendChild(button);
+    }
+}
+
+
+function createEllipsis() {
+    const span = document.createElement('span');
+    span.textContent = '...';
+    span.style.padding = '0 0.5rem';
+    span.style.color = '#666';
+    return span;
+}
+
+async function loadPage(page) {
+    if (page < 1 || page > totalPages || page === currentPage) {
+        return;
+    }
+
+    try {
+        const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
+        const urlsEndpoint = includeInactive
+            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${perPage}`
+            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${perPage}`;
+
+        const urlsData = await apiCall(urlsEndpoint);
+
+        // 更新URL列表
+        updateUrlList(urlsData.urls);
+
+        // 更新分页信息
+        updatePaginationInfo(urlsData.pagination);
+
+        // 滚动到顶部
+        document.getElementById('urlList').scrollIntoView({ behavior: 'smooth' });
+
+    } catch (error) {
+        console.error('加载页面失败:', error);
+        showError('加载失败', `无法加载第 ${page} 页数据`);
+    }
+}
+
 
 
 function updateUrlList(urls) {
@@ -781,6 +958,9 @@ async function filterByLabel(label) {
 
         updateUrlList(response.urls);
 
+        // 🔥 新增：筛选时隐藏分页（因为筛选结果通常不需要分页）
+        document.getElementById('paginationContainer').style.display = 'none';
+
         const filterInfo = document.getElementById('filterInfo');
         if (filterInfo) {
             filterInfo.innerHTML = `
@@ -811,7 +991,7 @@ function clearFilterInternal() {
 
 function clearFilter() {
     clearFilterInternal();
-    loadDashboardData().then(() => {});
+    resetToFirstPage(); // 恢复分页并回到第一页
 }
 
 // ================================
@@ -1981,8 +2161,9 @@ function updateUrlStatistics(urlsData) {
     const urlStats = document.getElementById('urlStats');
     if (!urlStats) return;
 
-    const stats = {
-        total: urlsData.total || 0,
+    // 使用分页数据中的统计信息
+    const stats = urlsData.stats || {
+        total: urlsData.pagination?.total || 0,
         active: urlsData.active || 0,
         inactive: urlsData.inactive || 0,
         available: urlsData.available || 0,
@@ -2024,30 +2205,10 @@ document.addEventListener('DOMContentLoaded', function() {
         urlCheckbox.addEventListener('change', function() {
             const isChecked = this.checked;
             showInfo('显示模式', isChecked ? '现在显示所有群聊（包括未激活）' : '现在只显示激活的群聊');
-        });
-    }
 
-    // 初始化统计区域
-    const urlStats = document.getElementById('urlStats');
-    if (urlStats && !urlStats.innerHTML.trim()) {
-        urlStats.innerHTML = `
-            <div class="stat-card">
-                <div class="stat-number" id="totalUrls">-</div>
-                <div class="stat-label">总群数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="availableUrls">-</div>
-                <div class="stat-label">可发送消息群聊</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="totalExecutions">-</div>
-                <div class="stat-label">总执行次数</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="completedUrls">-</div>
-                <div class="stat-label">已完成群聊</div>
-            </div>
-        `;
+            // 🔥 新增：切换时重置到第一页
+            resetToFirstPage();
+        });
     }
 });
 

@@ -1,14 +1,14 @@
 import requests
 
 # 基础URL
-BASE_URL = "http://localhost:5000"
+BASE_URL = "http://103.115.64.73:5000"
 
 def main():
     headers = {'token': 'Bearer ' + "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"}
     url = BASE_URL + "/api/update_running_status"
     json = {
-        'url_id': "414",
-        "running_status": True,
+        'url_id': "286",
+        "running_status": False,
     }
     r = requests.post(url, headers=headers, json=json)
     print(r.json())

@@ -33,22 +33,34 @@ def get_config_urls(config_id):
         if not config:
             return jsonify({'error': 'Config not found'}), 404
 
+        # 分页参数
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 50, type=int), 100)
         include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
 
+        # 使用索引优化的查询
         query = UrlData.query.filter_by(config_id=config_id)
         if not include_inactive:
             query = query.filter_by(is_active=True)
 
-        urls = query.order_by(UrlData.id).all()
+        # 执行分页查询
+        pagination = query.order_by(UrlData.id).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
 
         return jsonify({
             'config_id': config_id,
-            'urls': [url.to_dict() | {'pade_code': config.pade_code} for url in urls],
-            'total': len(urls),
-            'active': len([url for url in urls if url.is_active]),
-            'inactive': len([url for url in urls if not url.is_active]),
-            'available': len([url for url in urls if url.can_execute() and url.is_active]),
-            'running': len([url for url in urls if url.is_running and url.is_active]),
+            'urls': [url.to_dict() | {'pade_code': config.pade_code} for url in pagination.items],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': pagination.total,
+                'has_next': pagination.has_next,
+                'has_prev': pagination.has_prev
+            },
+            'total': pagination.total,
+            'active': UrlData.query.filter_by(config_id=config_id, is_active=True).count(),
+            'running': UrlData.query.filter_by(config_id=config_id, is_running=True).count(),
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
