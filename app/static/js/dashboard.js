@@ -381,7 +381,6 @@ function updateUrlStatus(urlId, status) {
     }
 }
 
-// 添加统计数据更新函数
 async function updateStatsFromSocket() {
     try {
         const statusData = await apiCall(`/api/config/${currentConfigId}/status`);
@@ -396,55 +395,42 @@ async function loadDashboardData() {
     if (!currentConfigId) {
         return;
     }
-
     try {
-        // 检查是否显示未激活群聊
         const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
 
-        const page = 1; // 首页
+        const page = currentPage || 1;
+        const pageSize = 5;
 
         const urlsEndpoint = includeInactive
-            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${perPage}`
-            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${perPage}`;
+            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${pageSize}`
+            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${pageSize}`;
 
         const [statusData, urlsData] = await Promise.all([
             apiCall(`/api/config/${currentConfigId}/status`),
             apiCall(urlsEndpoint)
         ]);
 
+
         currentConfigData = statusData.config;
 
-        // 更新基础统计
+        // 更新统计
         updateStatistics(statusData);
-
-        // 🔥 修改：处理分页响应数据
         updateUrlStatistics(urlsData);
 
-        // 根据当前筛选状态决定显示哪些URL
-        let urlsToDisplay;
-        if (currentFilter.isActive && currentFilter.type === 'label') {
-            await applyCurrentFilter();
-            const filteredResponse = await apiCall(`/api/urls/by-label/${encodeURIComponent(currentFilter.value)}?config_id=${currentConfigId}`);
-            urlsToDisplay = filteredResponse.urls;
-        } else {
-            updateUrlList(urlsData.urls);
-            urlsToDisplay = urlsData.urls;
-        }
+        // 更新URL列表
+        updateUrlList(urlsData.urls);
 
-        // 🔥 新增：显示分页信息
+        // 🔥 关键：更新分页信息
         updatePaginationInfo(urlsData.pagination);
 
-        // 初始化运行中URL缓存
-        initializeRunningUrlsCache(urlsToDisplay);
-
-        // 加载标签统计
+        // 其他逻辑...
+        initializeRunningUrlsCache(urlsData.urls);
         await loadLabelStats();
 
         lastUpdateTime = Date.now();
         updatePageTitle();
 
     } catch (error) {
-        console.error('加载数据失败:', error);
     }
 }
 
@@ -455,68 +441,77 @@ function updatePaginationInfo(pagination) {
         return;
     }
 
-    currentPage = pagination.page;
-    totalPages = pagination.pages;
-    perPage = pagination.per_page;
-    totalUrls = pagination.total;
-
-
+    // 🔥 确保数据类型正确
+    currentPage = parseInt(pagination.page) || 1;
+    totalPages = parseInt(pagination.pages) || 1;
+    perPage = parseInt(pagination.per_page) || 5;
+    totalUrls = parseInt(pagination.total) || 0;
+    // 如果只有一页，隐藏分页控件
     if (totalPages <= 1) {
         document.getElementById('paginationContainer').style.display = 'none';
         return;
     }
-
     // 显示分页控件
     document.getElementById('paginationContainer').style.display = 'block';
-
     // 更新分页信息文字
     const start = (currentPage - 1) * perPage + 1;
     const end = Math.min(currentPage * perPage, totalUrls);
     document.getElementById('paginationInfo').textContent =
         `显示第 ${start}-${end} 条，共 ${totalUrls} 条群聊`;
-
     // 更新按钮状态
-    document.getElementById('prevPageBtn').disabled = !pagination.has_prev;
-    document.getElementById('nextPageBtn').disabled = !pagination.has_next;
-
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    if (prevBtn) prevBtn.disabled = !pagination.has_prev;
+    if (nextBtn) nextBtn.disabled = !pagination.has_next;
     // 更新页码按钮
     updatePageNumbers();
 }
 
 
+
 function updatePageNumbers() {
     const pageNumbersContainer = document.getElementById('pageNumbers');
+    if (!pageNumbersContainer) return;
+
     pageNumbersContainer.innerHTML = '';
 
-    // 计算显示的页码范围
-    const maxVisible = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-
-    // 调整起始页
-    if (endPage - startPage + 1 < maxVisible) {
-        startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-
-    // 如果不是从第1页开始，添加第1页和省略号
-    if (startPage > 1) {
-        addPageButton(1);
-        if (startPage > 2) {
-            pageNumbersContainer.appendChild(createEllipsis());
+    // 🔥 简化逻辑：始终显示所有页码（如果页数不多）
+    if (totalPages <= 7) {
+        // 页数少时显示所有页码
+        for (let i = 1; i <= totalPages; i++) {
+            addPageButton(i);
         }
-    }
+    } else {
+        // 页数多时显示省略号
+        const maxVisible = 5;
+        let startPage = Math.max(1, currentPage - 2);
+        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
 
-    // 添加页码按钮
-    for (let i = startPage; i <= endPage; i++) {
-        addPageButton(i);
-    }
-
-    // 如果不是到最后一页，添加省略号和最后一页
-    if (endPage < totalPages) {
-        if (endPage < totalPages - 1) {
-            pageNumbersContainer.appendChild(createEllipsis());
+        // 调整范围
+        if (endPage - startPage + 1 < maxVisible) {
+            startPage = Math.max(1, endPage - maxVisible + 1);
         }
-        addPageButton(totalPages);
+
+        // 第一页
+        if (startPage > 1) {
+            addPageButton(1);
+            if (startPage > 2) {
+                pageNumbersContainer.appendChild(createEllipsis());
+            }
+        }
+
+        // 中间页码
+        for (let i = startPage; i <= endPage; i++) {
+            addPageButton(i);
+        }
+
+        // 最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                pageNumbersContainer.appendChild(createEllipsis());
+            }
+            addPageButton(totalPages);
+        }
     }
 }
 
@@ -546,11 +541,15 @@ function createEllipsis() {
 }
 
 async function loadPage(page) {
-    if (page < 1 || page > totalPages || page === currentPage) {
+
+    if (page < 1 || page > totalPages) {
+        console.warn(`页码超出范围: ${page}`);
         return;
     }
 
     try {
+        currentPage = page; // 🔥 先更新当前页码
+
         const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
         const urlsEndpoint = includeInactive
             ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${perPage}`
@@ -563,12 +562,13 @@ async function loadPage(page) {
 
         // 更新分页信息
         updatePaginationInfo(urlsData.pagination);
-
         // 滚动到顶部
-        document.getElementById('urlList').scrollIntoView({ behavior: 'smooth' });
+        const urlListElement = document.getElementById('urlList');
+        if (urlListElement) {
+            urlListElement.scrollIntoView({ behavior: 'smooth' });
+        }
 
     } catch (error) {
-        console.error('加载页面失败:', error);
         showError('加载失败', `无法加载第 ${page} 页数据`);
     }
 }
