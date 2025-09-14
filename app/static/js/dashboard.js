@@ -3,6 +3,12 @@ let isWebSocketConnected = false;
 let durationUpdateInterval = null;
 let runningUrls = new Map();
 let isWebSocketInitialized = false;
+let currentPage = 1;
+let totalPages = 1;
+let perPage = 5;
+let currentPagination = null;
+
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 首先初始化 WebSocket
     initWebSocket();
@@ -344,8 +350,8 @@ async function loadDashboardData() {
         // 检查是否显示未激活群聊
         const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
         const urlsEndpoint = includeInactive
-            ? `/api/config/${currentConfigId}/urls?include_inactive=true`
-            : `/api/config/${currentConfigId}/urls`;
+            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${currentPage}&per_page=${perPage}`
+            : `/api/config/${currentConfigId}/urls?page=${currentPage}&per_page=${perPage}`;
 
         const [statusData, urlsData] = await Promise.all([
             apiCall(`/api/config/${currentConfigId}/status`),
@@ -360,6 +366,13 @@ async function loadDashboardData() {
         // 更新URL统计（包含未激活数量）
         updateUrlStatistics(urlsData);
 
+        // 存储分页信息
+        currentPagination = urlsData.pagination;
+        if (currentPagination) {
+            currentPage = currentPagination.page;
+            totalPages = currentPagination.pages;
+        }
+
         // 根据当前筛选状态决定显示哪些URL
         let urlsToDisplay;
         if (currentFilter.isActive && currentFilter.type === 'label') {
@@ -370,6 +383,9 @@ async function loadDashboardData() {
             updateUrlList(urlsData.urls);
             urlsToDisplay = urlsData.urls;
         }
+
+        // 更新分页控件
+        updatePaginationControls();
 
         // 初始化运行中URL缓存
         initializeRunningUrlsCache(urlsToDisplay);
@@ -383,6 +399,106 @@ async function loadDashboardData() {
     } catch (error) {
         console.error('加载数据失败:', error);
     }
+}
+
+// 添加分页控件更新函数
+function updatePaginationControls() {
+    const paginationContainer = document.getElementById('paginationContainer');
+    if (!paginationContainer || !currentPagination) {
+        if (paginationContainer) {
+            paginationContainer.style.display = 'none';
+        }
+        return;
+    }
+
+    // 只有超过一页时才显示分页控件
+    if (currentPagination.pages <= 1) {
+        paginationContainer.style.display = 'none';
+        return;
+    }
+
+    paginationContainer.style.display = 'block';
+
+    // 更新分页信息
+    const infoElement = document.getElementById('paginationInfo');
+    if (infoElement) {
+        const start = (currentPagination.page - 1) * currentPagination.per_page + 1;
+        const end = Math.min(currentPagination.page * currentPagination.per_page, currentPagination.total);
+        infoElement.textContent = `显示第 ${start}-${end} 条，共 ${currentPagination.total} 条记录`;
+    }
+
+    // 更新按钮状态
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+
+    if (prevBtn) {
+        prevBtn.disabled = !currentPagination.has_prev;
+    }
+
+    if (nextBtn) {
+        nextBtn.disabled = !currentPagination.has_next;
+    }
+
+    // 更新页码
+    updatePageNumbers();
+}
+
+// 添加页码更新函数
+function updatePageNumbers() {
+    const pageNumbersContainer = document.getElementById('pageNumbers');
+    if (!pageNumbersContainer || !currentPagination) return;
+
+    let html = '';
+    const currentPage = currentPagination.page;
+    const totalPages = currentPagination.pages;
+
+    // 计算显示的页码范围
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    // 调整范围以确保显示5个页码（如果可能）
+    if (endPage - startPage < 4) {
+        if (startPage === 1) {
+            endPage = Math.min(totalPages, startPage + 4);
+        } else {
+            startPage = Math.max(1, endPage - 4);
+        }
+    }
+
+    // 第一页
+    if (startPage > 1) {
+        html += `<button class="btn btn-secondary btn-sm" onclick="loadPage(1)">1</button>`;
+        if (startPage > 2) {
+            html += '<span style="padding: 0 0.5rem;">...</span>';
+        }
+    }
+
+    // 页码按钮
+    for (let i = startPage; i <= endPage; i++) {
+        const isActive = i === currentPage;
+        html += `<button class="btn ${isActive ? 'btn-primary' : 'btn-secondary'} btn-sm" 
+                 onclick="loadPage(${i})" ${isActive ? 'disabled' : ''}>${i}</button>`;
+    }
+
+    // 最后一页
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += '<span style="padding: 0 0.5rem;">...</span>';
+        }
+        html += `<button class="btn btn-secondary btn-sm" onclick="loadPage(${totalPages})">${totalPages}</button>`;
+    }
+
+    pageNumbersContainer.innerHTML = html;
+}
+
+// 添加页面跳转函数
+async function loadPage(page) {
+    if (page < 1 || page > totalPages || page === currentPage) {
+        return;
+    }
+
+    currentPage = page;
+    await loadDashboardData();
 }
 
 
@@ -584,6 +700,11 @@ function switchMachine() {
 
     if (newConfigId && newConfigId !== currentConfigId) {
         currentConfigId = newConfigId;
+        // 重置分页状态
+        currentPage = 1;
+        totalPages = 1;
+        currentPagination = null;
+
         // 切换机器时清除筛选状态
         clearFilterInternal();
         updateCurrentMachineInfo();
@@ -1977,10 +2098,15 @@ function updateUrlStatistics(urlsData) {
         running: urlsData.running || 0
     };
 
+    // 添加分页提示信息
+    const pageInfo = currentPagination && currentPagination.pages > 1
+        ? `<small style="color: #666; font-size: 0.8rem; display: block; margin-top: 0.25rem;">当前显示第${currentPagination.page}页，共${currentPagination.pages}页</small>`
+        : '';
+
     urlStats.innerHTML = `
         <div class="stat-card">
             <div class="stat-number" style="color: #007bff;">${stats.total}</div>
-            <div class="stat-label">总群聊数</div>
+            <div class="stat-label">总群聊数${pageInfo}</div>
         </div>
         <div class="stat-card" style="border-left: 4px solid #28a745;">
             <div class="stat-number" style="color: #28a745;">${stats.active}</div>

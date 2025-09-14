@@ -1628,3 +1628,82 @@ body {
         min-width: 100px;
     }
 }
+
+/* 分页控件样式 */
+#paginationContainer {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+#paginationContainer > div {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#paginationInfo {
+    margin-bottom: 1rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+#paginationControls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+#pageNumbers {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+#pageNumbers .btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#pageNumbers .btn:disabled {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+    opacity: 1;
+}
+
+#prevPageBtn, #nextPageBtn {
+    min-width: 80px;
+}
+
+#prevPageBtn:disabled, #nextPageBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 响应式分页 */
+@media (max-width: 768px) {
+    #paginationControls {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    #pageNumbers {
+        order: -1;
+    }
+
+    #prevPageBtn, #nextPageBtn {
+        width: 100px;
+    }
+
+    #pageNumbers .btn {
+        min-width: 40px;
+        height: 40px;
+    }
+}

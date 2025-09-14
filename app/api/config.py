@@ -35,7 +35,7 @@ def get_config_urls(config_id):
 
         # 分页参数
         page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 50, type=int), 100)
+        per_page = min(request.args.get('per_page', 5, type=int), 100)  # 默认20条，最多100条
         include_inactive = request.args.get('include_inactive', 'false').lower() == 'true'
 
         # 构建查询
