@@ -3,12 +3,6 @@ let isWebSocketConnected = false;
 let durationUpdateInterval = null;
 let runningUrls = new Map();
 let isWebSocketInitialized = false;
-let currentPage = 1;
-let totalPages = 1;
-let perPage = 5;
-let totalUrls = 0;
-
-
 document.addEventListener('DOMContentLoaded', async () => {
     // 首先初始化 WebSocket
     initWebSocket();
@@ -76,27 +70,6 @@ function initWebSocket() {
     }
 }
 
-
-function startPollingMode() {
-    setInterval(async () => {
-        if (currentConfigId) {
-            try {
-                await updateStatsFromSocket();
-            } catch (error) {
-                console.error('轮询更新失败:', error);
-            }
-        }
-    }, 5000);
-}
-
-
-function resetToFirstPage() {
-    currentPage = 1;
-    loadPage(1).then(() => {});
-}
-
-
-
 // 设置 WebSocket 事件监听
 function setupWebSocketEvents() {
     socket.on('connect', function () {
@@ -140,12 +113,6 @@ function setupWebSocketEvents() {
         if (data.config_id === currentConfigId) {
             updateRunningUrlsCache(data.url_data);
             updateSingleUrlItem(data.url_data);
-            startDurationUpdates();
-            // 强制刷新确保状态同步
-            loadDashboardData().then(() => {
-            }).catch(error => {
-                console.error('状态同步失败:', error);
-            });
         }
     });
 
@@ -154,12 +121,6 @@ function setupWebSocketEvents() {
         if (data.config_id === currentConfigId) {
             removeFromRunningUrlsCache(data.url_id);
             updateSingleUrlItem(data.url_data);
-            startDurationUpdates();
-            // 强制刷新确保状态同步
-            loadDashboardData().then(() => {
-            }).catch(error => {
-                console.error('状态同步失败:', error);
-            });
         }
     });
 
@@ -363,6 +324,7 @@ function updateUrlStatus(urlId, status) {
     }
 }
 
+// 添加统计数据更新函数
 async function updateStatsFromSocket() {
     try {
         const statusData = await apiCall(`/api/config/${currentConfigId}/status`);
@@ -377,184 +339,51 @@ async function loadDashboardData() {
     if (!currentConfigId) {
         return;
     }
+
     try {
+        // 检查是否显示未激活群聊
         const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
-
-        const page = currentPage || 1;
-        const pageSize = 5;
-
         const urlsEndpoint = includeInactive
-            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${pageSize}`
-            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${pageSize}`;
+            ? `/api/config/${currentConfigId}/urls?include_inactive=true`
+            : `/api/config/${currentConfigId}/urls`;
 
         const [statusData, urlsData] = await Promise.all([
             apiCall(`/api/config/${currentConfigId}/status`),
             apiCall(urlsEndpoint)
         ]);
 
-
         currentConfigData = statusData.config;
 
-        // 更新统计
+        // 更新基础统计
         updateStatistics(statusData);
+
+        // 更新URL统计（包含未激活数量）
         updateUrlStatistics(urlsData);
 
-        // 更新URL列表
-        updateUrlList(urlsData.urls);
+        // 根据当前筛选状态决定显示哪些URL
+        let urlsToDisplay;
+        if (currentFilter.isActive && currentFilter.type === 'label') {
+            await applyCurrentFilter();
+            const filteredResponse = await apiCall(`/api/urls/by-label/${encodeURIComponent(currentFilter.value)}?config_id=${currentConfigId}`);
+            urlsToDisplay = filteredResponse.urls;
+        } else {
+            updateUrlList(urlsData.urls);
+            urlsToDisplay = urlsData.urls;
+        }
 
-        // 🔥 关键：更新分页信息
-        updatePaginationInfo(urlsData.pagination);
+        // 初始化运行中URL缓存
+        initializeRunningUrlsCache(urlsToDisplay);
 
-        // 其他逻辑...
-        initializeRunningUrlsCache(urlsData.urls);
+        // 加载标签统计
         await loadLabelStats();
 
         lastUpdateTime = Date.now();
         updatePageTitle();
 
     } catch (error) {
+        console.error('加载数据失败:', error);
     }
 }
-
-
-function updatePaginationInfo(pagination) {
-    if (!pagination) {
-        document.getElementById('paginationContainer').style.display = 'none';
-        return;
-    }
-
-    // 🔥 确保数据类型正确
-    currentPage = parseInt(pagination.page) || 1;
-    totalPages = parseInt(pagination.pages) || 1;
-    perPage = parseInt(pagination.per_page) || 5;
-    totalUrls = parseInt(pagination.total) || 0;
-    // 如果只有一页，隐藏分页控件
-    if (totalPages <= 1) {
-        document.getElementById('paginationContainer').style.display = 'none';
-        return;
-    }
-    // 显示分页控件
-    document.getElementById('paginationContainer').style.display = 'block';
-    // 更新分页信息文字
-    const start = (currentPage - 1) * perPage + 1;
-    const end = Math.min(currentPage * perPage, totalUrls);
-    document.getElementById('paginationInfo').textContent =
-        `显示第 ${start}-${end} 条，共 ${totalUrls} 条群聊`;
-    // 更新按钮状态
-    const prevBtn = document.getElementById('prevPageBtn');
-    const nextBtn = document.getElementById('nextPageBtn');
-    if (prevBtn) prevBtn.disabled = !pagination.has_prev;
-    if (nextBtn) nextBtn.disabled = !pagination.has_next;
-    // 更新页码按钮
-    updatePageNumbers();
-}
-
-
-
-function updatePageNumbers() {
-    const pageNumbersContainer = document.getElementById('pageNumbers');
-    if (!pageNumbersContainer) return;
-
-    pageNumbersContainer.innerHTML = '';
-
-    // 🔥 简化逻辑：始终显示所有页码（如果页数不多）
-    if (totalPages <= 7) {
-        // 页数少时显示所有页码
-        for (let i = 1; i <= totalPages; i++) {
-            addPageButton(i);
-        }
-    } else {
-        // 页数多时显示省略号
-        const maxVisible = 5;
-        let startPage = Math.max(1, currentPage - 2);
-        let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-
-        // 调整范围
-        if (endPage - startPage + 1 < maxVisible) {
-            startPage = Math.max(1, endPage - maxVisible + 1);
-        }
-
-        // 第一页
-        if (startPage > 1) {
-            addPageButton(1);
-            if (startPage > 2) {
-                pageNumbersContainer.appendChild(createEllipsis());
-            }
-        }
-
-        // 中间页码
-        for (let i = startPage; i <= endPage; i++) {
-            addPageButton(i);
-        }
-
-        // 最后一页
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                pageNumbersContainer.appendChild(createEllipsis());
-            }
-            addPageButton(totalPages);
-        }
-    }
-}
-
-
-function addPageButton(pageNum) {
-    const button = document.createElement('button');
-    button.className = pageNum === currentPage
-        ? 'btn btn-primary btn-sm'
-        : 'btn btn-secondary btn-sm';
-    button.textContent = pageNum;
-    button.onclick = () => loadPage(pageNum);
-    button.style.cssText = 'min-width: 40px; margin: 0 2px;';
-
-    const pageNumbersContainer = document.getElementById('pageNumbers');
-    if (pageNumbersContainer) {
-        pageNumbersContainer.appendChild(button);
-    }
-}
-
-
-function createEllipsis() {
-    const span = document.createElement('span');
-    span.textContent = '...';
-    span.style.padding = '0 0.5rem';
-    span.style.color = '#666';
-    return span;
-}
-
-async function loadPage(page) {
-
-    if (page < 1 || page > totalPages) {
-        console.warn(`页码超出范围: ${page}`);
-        return;
-    }
-
-    try {
-        currentPage = page; // 🔥 先更新当前页码
-
-        const includeInactive = document.getElementById('showInactiveUrlsCheckbox')?.checked || false;
-        const urlsEndpoint = includeInactive
-            ? `/api/config/${currentConfigId}/urls?include_inactive=true&page=${page}&per_page=${perPage}`
-            : `/api/config/${currentConfigId}/urls?page=${page}&per_page=${perPage}`;
-
-        const urlsData = await apiCall(urlsEndpoint);
-
-        // 更新URL列表
-        updateUrlList(urlsData.urls);
-
-        // 更新分页信息
-        updatePaginationInfo(urlsData.pagination);
-        // 滚动到顶部
-        const urlListElement = document.getElementById('urlList');
-        if (urlListElement) {
-            urlListElement.scrollIntoView({ behavior: 'smooth' });
-        }
-
-    } catch (error) {
-        showError('加载失败', `无法加载第 ${page} 页数据`);
-    }
-}
-
 
 
 function updateUrlList(urls) {
@@ -940,9 +769,6 @@ async function filterByLabel(label) {
 
         updateUrlList(response.urls);
 
-        // 🔥 新增：筛选时隐藏分页（因为筛选结果通常不需要分页）
-        document.getElementById('paginationContainer').style.display = 'none';
-
         const filterInfo = document.getElementById('filterInfo');
         if (filterInfo) {
             filterInfo.innerHTML = `
@@ -973,7 +799,7 @@ function clearFilterInternal() {
 
 function clearFilter() {
     clearFilterInternal();
-    resetToFirstPage(); // 恢复分页并回到第一页
+    loadDashboardData().then(() => {});
 }
 
 // ================================
@@ -2143,9 +1969,8 @@ function updateUrlStatistics(urlsData) {
     const urlStats = document.getElementById('urlStats');
     if (!urlStats) return;
 
-    // 使用分页数据中的统计信息
-    const stats = urlsData.stats || {
-        total: urlsData.pagination?.total || 0,
+    const stats = {
+        total: urlsData.total || 0,
         active: urlsData.active || 0,
         inactive: urlsData.inactive || 0,
         available: urlsData.available || 0,
@@ -2187,10 +2012,30 @@ document.addEventListener('DOMContentLoaded', function() {
         urlCheckbox.addEventListener('change', function() {
             const isChecked = this.checked;
             showInfo('显示模式', isChecked ? '现在显示所有群聊（包括未激活）' : '现在只显示激活的群聊');
-
-            // 🔥 新增：切换时重置到第一页
-            resetToFirstPage();
         });
+    }
+
+    // 初始化统计区域
+    const urlStats = document.getElementById('urlStats');
+    if (urlStats && !urlStats.innerHTML.trim()) {
+        urlStats.innerHTML = `
+            <div class="stat-card">
+                <div class="stat-number" id="totalUrls">-</div>
+                <div class="stat-label">总群数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="availableUrls">-</div>
+                <div class="stat-label">可发送消息群聊</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalExecutions">-</div>
+                <div class="stat-label">总执行次数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completedUrls">-</div>
+                <div class="stat-label">已完成群聊</div>
+            </div>
+        `;
     }
 });
 
