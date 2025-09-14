@@ -318,6 +318,7 @@ def batch_update_labels():
 
 
 @bp.route('/update_running_status', methods=['POST'])
+@token_required
 def update_running_status():
     url_id = request.json.get('url_id')
     running_status = bool(request.json.get('running_status'))
