@@ -4,12 +4,14 @@
     <title>消息管理系统 - 仪表板</title>
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="referrer" content="no-referrer">
     <link href="../static/css/common.css" rel="stylesheet">
     <link href="../static/css/dashboard.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script src="../static/js/notification.js"></script>
-    <script src="../static/js/common.js"></script>
-    <script src="../static/js/dashboard.js"></script>
+    <link rel="preload" href="../static/js/notification.js" as="script">
+    <link rel="preload" href="../static/js/dashboard.js" as="script">
+    <link rel="preload" href="../static/js/common.js" as="script">
 </head>
 <body>
 <div class="header">
@@ -486,12 +488,14 @@
         <form onsubmit="processBatchImportUrls(event)">
             <div style="margin-bottom: 1rem;">
                 <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">群聊列表:</label>
-                <textarea
-                        id="batchUrlsInput"
-                        rows="12"
-                        placeholder="请输入群聊信息，例如：&#10;https://t.me/group1 | 第一个群聊&#10;https://t.me/group2 | 第二个群聊&#10;或者每行一个群聊名称"
-                        style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; resize: vertical; line-height: 1.4;"
-                ></textarea>
+                <label for="batchUrlsInput">
+                    <textarea
+                            id="batchUrlsInput"
+                            rows="12"
+                            placeholder="请输入群聊信息，例如：&#10;https://t.me/group1 | 第一个群聊&#10;https://t.me/group2 | 第二个群聊&#10;或者每行一个群聊名称"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-family: monospace; resize: vertical; line-height: 1.4;"
+                    ></textarea>
+                </label>
                 <small style="color: #666; margin-top: 0.5rem; display: block;">
                     💡 提示：可以直接粘贴群聊链接列表，系统会自动解析
                 </small>
@@ -500,13 +504,17 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label style="font-weight: bold;">默认持续时间(秒):</label>
-                    <input id="batchDuration" type="number" min="1" value="30"
-                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                    <label for="batchDuration">
+                        <input id="batchDuration" type="number" min="1" value="30"
+                               style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                    </label>
                 </div>
                 <div>
                     <label style="font-weight: bold;">默认最大执行次数:</label>
-                    <input id="batchMaxNum" type="number" min="1" value="3"
-                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                    <label for="batchMaxNum">
+                        <input id="batchMaxNum" type="number" min="1" value="3"
+                               style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; margin-top: 0.25rem;">
+                    </label>
                 </div>
             </div>
 
@@ -557,27 +565,33 @@
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">按状态筛选:</label>
-                    <select id="deleteFilterStatus" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="all">全部群聊</option>
-                        <option value="active">仅激活的群聊</option>
-                        <option value="inactive">仅未激活的群聊</option>
-                        <option value="completed">已完成的群聊</option>
-                        <option value="running">正在运行的群聊</option>
-                    </select>
+                    <label for="deleteFilterStatus">
+                        <select id="deleteFilterStatus" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="all">全部群聊</option>
+                            <option value="active">仅激活的群聊</option>
+                            <option value="inactive">仅未激活的群聊</option>
+                            <option value="completed">已完成的群聊</option>
+                            <option value="running">正在运行的群聊</option>
+                        </select>
+                    </label>
                 </div>
                 <div>
                     <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">按标签筛选:</label>
-                    <select id="deleteFilterLabel" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                        <option value="all">全部标签</option>
-                        <option value="no-label">无标签</option>
-                    </select>
+                    <label for="deleteFilterLabel">
+                        <select id="deleteFilterLabel" onchange="filterDeleteUrls()" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="all">全部标签</option>
+                            <option value="no-label">无标签</option>
+                        </select>
+                    </label>
                 </div>
             </div>
             <div>
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: bold;">搜索群聊:</label>
-                <input type="text" id="deleteSearchInput" placeholder="搜索群聊名称或URL..."
-                       oninput="filterDeleteUrls()"
-                       style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <label for="deleteSearchInput">
+                    <input type="text" id="deleteSearchInput" placeholder="搜索群聊名称或URL..."
+                           oninput="filterDeleteUrls()"
+                           style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                </label>
             </div>
         </div>
 
@@ -619,5 +633,28 @@
         </div>
     </div>
 </div>
+<script>
+    window.addEventListener('error', function(event) {
+        if (event.error && (
+            event.error.message.includes('MutationObserver') ||
+            event.error.message.includes('content_script') ||
+            (event.filename && event.filename.includes('extension'))
+        )) {
+            event.preventDefault();
+            return false;
+        }
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+        if (event.reason && event.reason.message &&
+            event.reason.message.includes('Socket.IO')) {
+            event.preventDefault();
+        }
+    });
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+<script src="../static/js/notification.js"></script>
+<script src="../static/js/common.js"></script>
+<script src="../static/js/dashboard.js"></script>
 </body>
 </html>

@@ -20,12 +20,16 @@ def create_app(config_class=Config):
 
     socketio.init_app(app,
                       cors_allowed_origins="*",
-                      async_mode='eventlet',  # 指定异步模式
-                      logger=False,  # 启用日志
-                      engineio_logger=False,  # 启用引擎日志
-                      ping_timeout=60,  # 增加超时时间
-                      ping_interval=25,  # 设置心跳间隔
-                      transports=['websocket', 'polling']  # 明确指定传输方式
+                      async_mode='eventlet',
+                      logger=False,
+                      engineio_logger=False,
+                      ping_timeout=30,      # 减少ping超时时间
+                      ping_interval=10,     # 减少ping间隔
+                      transports=['websocket', 'polling'],
+                      max_http_buffer_size=1e6,
+                      # 添加以下配置以提高性能
+                      compression=True,     # 启用压缩
+                      cookie=False,         # 禁用cookie（减少开销）
                       )
 
     from app.services.cleanup_scheduler import cleanup_scheduler

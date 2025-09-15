@@ -5,7 +5,7 @@ let runningUrls = new Map();
 let isWebSocketInitialized = false;
 let currentPage = 1;
 let totalPages = 1;
-let perPage = 5;
+let perPage = 8;
 let currentPagination = null;
 
 
@@ -43,37 +43,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // WebSocket 初始化函数
 function initWebSocket() {
-    if (typeof io === 'undefined') {
-        showError('连接错误', 'Socket.IO 库加载失败，实时更新功能不可用');
-        return;
-    }
-
-    try {
-        if (socket) {
-            socket.disconnect();
-            socket = null;
+    // 延迟初始化，避免阻塞页面加载
+    setTimeout(() => {
+        if (typeof io === 'undefined') {
+            console.warn('Socket.IO 库未加载，使用轮询模式');
+            startPollingMode();
+            return;
         }
 
-        // 修改连接配置，解决升级问题
-        socket = io('/', {
-            transports: ['polling', 'websocket'],
-            upgrade: true,
-            timeout: 20000,
-            forceNew: true,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000,
-            maxHttpBufferSize: 1e6,
-            pingTimeout: 60000,
-            pingInterval: 25000
-        });
+        try {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
 
-        setupWebSocketEvents();
-        isWebSocketInitialized = true;
-    } catch (error) {
-        console.error('WebSocket 初始化失败:', error);
-        showError('连接失败', 'WebSocket 连接初始化失败');
-    }
+            // 优化配置，减少连接时间
+            socket = io('/', {
+                transports: ['websocket', 'polling'],
+                upgrade: true,
+                timeout: 5000,        // 减少超时时间
+                forceNew: false,      // 允许复用连接
+                reconnection: true,
+                reconnectionAttempts: 3, // 减少重连次数
+                reconnectionDelay: 1000,
+                maxHttpBufferSize: 1e6,
+                pingTimeout: 30000,   // 减少ping超时
+                pingInterval: 10000   // 减少ping间隔
+            });
+
+            setupWebSocketEvents();
+            isWebSocketInitialized = true;
+        } catch (error) {
+            console.error('WebSocket 初始化失败:', error);
+            startPollingMode(); // 降级到轮询模式
+        }
+    }, 100); // 延迟100ms，让页面先渲染
+}
+
+function startPollingMode() {
+    console.log('启动轮询模式');
+    setInterval(() => {
+        if (currentConfigId && document.visibilityState === 'visible') {
+            loadDashboardData().catch(console.error);
+        }
+    }, 10000); // 每10秒轮询一次
 }
 
 // 设置 WebSocket 事件监听
@@ -588,22 +601,87 @@ window.addEventListener('beforeunload', () => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 初始化 WebSocket
-    initWebSocket();
+    try {
+        // 显示加载状态
+        showLoadingState();
 
-    await loadMachineList();
+        // 1. 首先加载机器列表（最重要）
+        await loadMachineList();
 
-    if (currentConfigId) {
-        await loadDashboardData();
-    }
-
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && currentConfigId) {
-            loadDashboardData();
+        // 2. 如果有选中机器，加载数据
+        if (currentConfigId) {
+            await loadDashboardData();
         }
-    });
+
+        // 3. 最后初始化WebSocket（非阻塞）
+        initWebSocket();
+
+        // 4. 设置页面可见性监听
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopDurationUpdates();
+            } else if (isWebSocketConnected && currentConfigId) {
+                startDurationUpdates();
+                loadDashboardData().catch(console.error);
+            }
+        });
+
+    } catch (error) {
+        console.error('页面初始化失败:', error);
+        showError('初始化失败', '页面加载出现问题，请刷新重试');
+    } finally {
+        hideLoadingState();
+    }
 });
 
+function showLoadingState() {
+    const existing = document.getElementById('page-loading');
+    if (existing) return;
+
+    const loadingHtml = `
+        <div id="page-loading" style="
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255, 255, 255, 0.95); z-index: 10000; 
+            display: flex; align-items: center; justify-content: center;
+            backdrop-filter: blur(2px);
+        ">
+            <div style="text-align: center; padding: 2rem;">
+                <div style="
+                    width: 40px; height: 40px; border: 4px solid #f3f3f3;
+                    border-top: 4px solid #007bff; border-radius: 50%;
+                    animation: spin 1s linear infinite; margin: 0 auto 1rem;
+                "></div>
+                <p style="color: #333; margin: 0;">正在加载系统数据...</p>
+            </div>
+        </div>
+        <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        </style>
+    `;
+    document.body.insertAdjacentHTML('beforeend', loadingHtml);
+}
+
+
+function hideLoadingState() {
+    const loading = document.getElementById('page-loading');
+    if (loading) {
+        loading.style.opacity = '0';
+        setTimeout(() => loading.remove(), 300);
+    }
+}
+
+window.addEventListener('error', (event) => {
+    if (event.error && event.error.message &&
+        (event.error.message.includes('MutationObserver') ||
+            event.filename && event.filename.includes('content_script'))) {
+        console.warn('检测到浏览器插件错误，已忽略:', event.error.message);
+        event.preventDefault();
+        return false;
+    }
+});
 
 async function apiCall(url, options = {}) {
     try {
