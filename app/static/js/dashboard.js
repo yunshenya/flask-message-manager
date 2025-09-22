@@ -2961,6 +2961,16 @@ async function showBatchDeleteUrlModal() {
     // 显示模态框
     document.getElementById('batchDeleteUrlModal').style.display = 'block';
 
+    // 显示加载状态
+    document.getElementById('deleteUrlsList').innerHTML = `
+        <div style="text-align: center; padding: 3rem; color: #666;">
+            <div style="margin-bottom: 1rem;">
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+            </div>
+            <p style="margin: 0;">正在加载所有群聊数据，请稍候...</p>
+        </div>
+    `;
+
     // 加载群聊数据
     await loadDeleteUrls();
 }
@@ -2974,8 +2984,7 @@ function hideBatchDeleteUrlModal() {
 
 async function loadDeleteUrls() {
     try {
-        // 加载包含未激活群聊的完整列表
-        const response = await apiCall(`/api/config/${currentConfigId}/urls?include_inactive=true`);
+        const response = await apiCall(`/api/config/${currentConfigId}/urls?include_inactive=true&all=true`);
         allDeleteUrls = response.urls || [];
 
         // 加载标签列表用于筛选
@@ -3081,6 +3090,90 @@ function displayDeleteUrls() {
         return;
     }
 
+    // 性能优化：如果数据量很大，只显示前500条并添加提示
+    const maxDisplayCount = 500;
+    const urlsToDisplay = filteredDeleteUrls.slice(0, maxDisplayCount);
+    const hasMore = filteredDeleteUrls.length > maxDisplayCount;
+
+    let html = '';
+
+    if (hasMore) {
+        html += `
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; text-align: center;">
+                <strong>⚠️ 数据量较大</strong><br>
+                共找到 ${filteredDeleteUrls.length} 个群聊，当前显示前 ${maxDisplayCount} 个。<br>
+                请使用筛选功能缩小范围，或滚动到底部查看更多。
+            </div>
+        `;
+    }
+
+    urlsToDisplay.forEach(url => {
+        const isSelected = selectedDeleteUrls.has(url.id);
+        const hasLabel = url.label && url.label.trim();
+        const isInactive = !url.is_active;
+        const isCompleted = url.current_count >= url.max_num;
+        const isRunning = url.is_running;
+
+        // 确定状态样式
+        let statusBadge = '';
+        let rowClass = '';
+
+        if (isInactive) {
+            statusBadge = '<span style="background: #ffc107; color: #212529; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">未激活</span>';
+            rowClass = 'delete-item-inactive';
+        } else if (isRunning) {
+            statusBadge = '<span style="background: #28a745; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">运行中</span>';
+            rowClass = 'delete-item-running';
+        } else if (isCompleted) {
+            statusBadge = '<span style="background: #6c757d; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">已完成</span>';
+            rowClass = 'delete-item-completed';
+        }
+
+        html += `
+            <div class="delete-url-item ${rowClass} ${isSelected ? 'selected' : ''}" data-url-id="${url.id}">
+                <div style="display: flex; align-items: center; padding: 0.75rem; border-bottom: 1px solid #eee;">
+                    <label style="display: flex; align-items: center; gap: 0.75rem; flex: 1; margin: 0; cursor: pointer;">
+                        <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                               onchange="toggleDeleteUrlSelection(${url.id})" 
+                               style="transform: scale(1.2);">
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold; margin-bottom: 0.25rem; display: flex; align-items: center;">
+                                ${url.name}
+                                ${hasLabel ? `<span style="background: #17a2b8; color: white; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.7rem; margin-left: 0.5rem;">${url.label}</span>` : ''}
+                                ${statusBadge}
+                            </div>
+                            <div style="color: #666; font-size: 0.9rem; margin-bottom: 0.25rem;">${url.url}</div>
+                            <div style="font-size: 0.8rem; color: #666;">
+                                执行次数: ${url.current_count}/${url.max_num} | 
+                                持续: ${url.duration}秒 | 
+                                ${url.Last_time ? '最后执行: ' + new Date(url.Last_time).toLocaleString() : '从未执行'}
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        `;
+    });
+
+    // 如果有更多数据，添加加载更多按钮
+    if (hasMore) {
+        html += `
+            <div style="text-align: center; padding: 1rem;">
+                <button class="btn btn-info" onclick="showMoreDeleteUrls()" id="showMoreDeleteBtn">
+                    显示更多 (剩余 ${filteredDeleteUrls.length - maxDisplayCount} 个)
+                </button>
+            </div>
+        `;
+    }
+
+    listDiv.innerHTML = html;
+}
+
+// 添加显示更多的函数
+function showMoreDeleteUrls() {
+    // 重新显示所有数据
+    const listDiv = document.getElementById('deleteUrlsList');
+
     let html = '';
     filteredDeleteUrls.forEach(url => {
         const isSelected = selectedDeleteUrls.has(url.id);
@@ -3131,6 +3224,8 @@ function displayDeleteUrls() {
     });
 
     listDiv.innerHTML = html;
+
+    showInfo('显示更多', `现在显示全部 ${filteredDeleteUrls.length} 个群聊`);
 }
 
 function toggleDeleteUrlSelection(urlId) {
