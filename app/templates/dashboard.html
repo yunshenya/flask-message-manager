@@ -477,11 +477,18 @@
             <div style="color: #1976d2; font-size: 0.9rem;">
                 <p style="margin: 0.5rem 0;">支持以下格式（每行一个群聊）：</p>
                 <ul style="margin: 0.5rem 0 0 1rem;">
-                    <li><strong>URL和名称：</strong> https://t.me/groupname | 群聊名称</li>
+                    <li><strong>简单格式：</strong> https://t.me/groupname | 群聊名称</li>
+                    <li><strong>完整格式：</strong> https://t.me/groupname｜群聊名称 3个小时｜5</li>
                     <li><strong>只有URL：</strong> https://t.me/groupname （自动使用URL作为名称）</li>
-                    <li><strong>只有名称：</strong> 群聊名称 （需要手动设置URL）</li>
                 </ul>
-                <p style="margin: 0.5rem 0 0 0; font-weight: bold;">分隔符：使用 | 或 ---- 分隔URL和名称</p>
+                <div style="background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 0.5rem; border-radius: 3px; margin-top: 0.5rem;">
+                    <strong>💡 完整格式说明：</strong><br>
+                    <code>URL｜名称 时间｜次数</code><br>
+                    • 时间支持：1个小时、2小时、30分钟等<br>
+                    • 次数为数字：1、2、3等<br>
+                    • 如未指定时间/次数，使用下方默认配置
+                </div>
+                <p style="margin: 0.5rem 0 0 0; font-weight: bold;">分隔符：使用 ｜ 、| 或 ---- 分隔各部分</p>
             </div>
         </div>
 

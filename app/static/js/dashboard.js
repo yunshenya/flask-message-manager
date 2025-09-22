@@ -2713,9 +2713,38 @@ function parseBatchUrlInput(input) {
         const line = lines[i];
         let url = '';
         let name = '';
+        let duration = 30; // 默认30秒
+        let maxNum = 3;    // 默认3次
 
-        // 检查是否包含分隔符
-        if (line.includes('｜')) {
+        // 检查是否包含复杂格式：URL｜名称 时间 ｜次数
+        if (line.includes('｜') && line.split('｜').length >= 3) {
+            const parts = line.split('｜').map(part => part.trim());
+
+            if (parts.length >= 3) {
+                url = parts[0] || '';
+
+                // 第二部分包含名称和时间
+                const nameAndTime = parts[1] || '';
+                const timeMatch = nameAndTime.match(/(\d+)\s*个?小时/);
+                if (timeMatch) {
+                    // 提取时间（小时转秒）
+                    duration = parseInt(timeMatch[1]) * 3600;
+                    // 提取名称（去掉时间部分）
+                    name = nameAndTime.replace(/\d+\s*个?小时/, '').trim();
+                } else {
+                    name = nameAndTime;
+                }
+
+                // 第三部分是次数
+                const maxNumStr = parts[2] || '';
+                const numMatch = maxNumStr.match(/(\d+)/);
+                if (numMatch) {
+                    maxNum = parseInt(numMatch[1]);
+                }
+            }
+        }
+        // 检查标准分隔符格式
+        else if (line.includes('｜')) {
             const parts = line.split('｜').map(part => part.trim());
             url = parts[0] || '';
             name = parts[1] || parts[0] || `群聊_${i + 1}`;
@@ -2723,7 +2752,7 @@ function parseBatchUrlInput(input) {
             const parts = line.split('----').map(part => part.trim());
             url = parts[0] || '';
             name = parts[1] || parts[0] || `群聊_${i + 1}`;
-        }else if (line.includes("|")){
+        } else if (line.includes('|')) {
             const parts = line.split('|').map(part => part.trim());
             url = parts[0] || '';
             name = parts[1] || parts[0] || `群聊_${i + 1}`;
@@ -2739,10 +2768,18 @@ function parseBatchUrlInput(input) {
             }
         }
 
+        // 清理和验证数据
         if (url || name) {
+            // 如果没有提取到名称，使用默认名称
+            if (!name || name.trim() === '') {
+                name = extractNameFromUrl(url) || `群聊_${i + 1}`;
+            }
+
             results.push({
                 url: url,
                 name: name,
+                duration: duration,
+                maxNum: maxNum,
                 originalLine: line,
                 lineNumber: i + 1
             });
@@ -2783,12 +2820,42 @@ function displayImportPreview(parsedUrls) {
         const hasIssue = !item.url || !item.name;
         const issueClass = hasIssue ? 'style="color: #dc3545; background: #f8d7da; padding: 0.25rem; border-radius: 3px;"' : '';
 
+        // 格式化时间显示
+        let timeDisplay = '';
+        if (item.duration !== 30) { // 如果不是默认值
+            if (item.duration >= 3600) {
+                const hours = Math.floor(item.duration / 3600);
+                const minutes = Math.floor((item.duration % 3600) / 60);
+                timeDisplay = minutes > 0 ? `${hours}小时${minutes}分钟` : `${hours}小时`;
+            } else if (item.duration >= 60) {
+                const minutes = Math.floor(item.duration / 60);
+                const seconds = item.duration % 60;
+                timeDisplay = seconds > 0 ? `${minutes}分${seconds}秒` : `${minutes}分钟`;
+            } else {
+                timeDisplay = `${item.duration}秒`;
+            }
+        } else {
+            timeDisplay = '30秒(默认)';
+        }
+
+        // 次数显示
+        const countDisplay = item.maxNum !== 3 ? `${item.maxNum}次` : '3次(默认)';
+
         html += `
-            <div ${issueClass} style="padding: 0.25rem 0; border-bottom: 1px solid #eee; font-family: monospace;">
-                <strong>${index + 1}.</strong> 
-                URL: <span style="color: #007bff;">${item.url || '❌ 缺失'}</span> | 
-                名称: <span style="color: #28a745;">${item.name || '❌ 缺失'}</span>
-                ${hasIssue ? '<span style="color: #dc3545; font-weight: bold;"> ⚠️ 需要修正</span>' : ''}
+            <div ${issueClass} style="padding: 0.5rem; margin-bottom: 0.25rem; border-bottom: 1px solid #eee; font-family: monospace; font-size: 0.85rem;">
+                <div style="display: grid; grid-template-columns: auto 1fr auto auto; gap: 0.5rem; align-items: center;">
+                    <strong style="color: #495057;">${index + 1}.</strong>
+                    <div style="min-width: 0;">
+                        <div style="color: #007bff; word-break: break-all;">${item.url || '❌ 缺失URL'}</div>
+                        <div style="color: #28a745; font-weight: bold;">${item.name || '❌ 缺失名称'}</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="background: #e3f2fd; color: #1976d2; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; margin-bottom: 0.1rem;">${timeDisplay}</div>
+                        <div style="background: #f3e5f5; color: #7b1fa2; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem;">${countDisplay}</div>
+                    </div>
+                    ${hasIssue ? '<div style="color: #dc3545; font-weight: bold;">⚠️</div>' : '<div style="color: #28a745; font-weight: bold;">✅</div>'}
+                </div>
+                ${hasIssue ? '<div style="color: #dc3545; font-size: 0.75rem; margin-top: 0.25rem;">⚠️ 需要修正数据</div>' : ''}
             </div>
         `;
     });
@@ -2840,17 +2907,21 @@ async function processBatchImportUrls(event) {
         return;
     }
 
-    if (!await showConfirm(
-        '确认导入',
-        `确定要导入 ${parsedUrls.length} 个群聊到当前机器吗？`,
-        'primary'
-    )) {
+    // 统计解析出的自定义配置
+    const customConfigs = parsedUrls.filter(item => item.duration !== 30 || item.maxNum !== 3);
+    let confirmMessage = `确定要导入 ${parsedUrls.length} 个群聊到当前机器吗？`;
+
+    if (customConfigs.length > 0) {
+        confirmMessage += `\n\n其中 ${customConfigs.length} 个群聊使用了自定义配置（时间/次数），将忽略下方的默认配置。`;
+    }
+
+    if (!await showConfirm('确认导入', confirmMessage, 'primary')) {
         return;
     }
 
-    // 获取配置
-    const duration = parseInt(document.getElementById('batchDuration').value);
-    const maxNum = parseInt(document.getElementById('batchMaxNum').value);
+    // 获取默认配置（仅对没有自定义配置的群聊使用）
+    const defaultDuration = parseInt(document.getElementById('batchDuration').value);
+    const defaultMaxNum = parseInt(document.getElementById('batchMaxNum').value);
     const isActive = document.getElementById('batchIsActive').checked;
 
     // 开始批量导入
@@ -2869,8 +2940,9 @@ async function processBatchImportUrls(event) {
                 config_id: currentConfigId,
                 url: item.url,
                 name: item.name,
-                duration: duration,
-                max_num: maxNum,
+                // 如果解析出了自定义配置，使用解析的值，否则使用默认值
+                duration: item.duration !== 30 ? item.duration : defaultDuration,
+                max_num: item.maxNum !== 3 ? item.maxNum : defaultMaxNum,
                 is_active: isActive
             };
 
@@ -2883,7 +2955,9 @@ async function processBatchImportUrls(event) {
             results.push({
                 ...item,
                 status: 'success',
-                message: '导入成功'
+                message: '导入成功',
+                usedDuration: data.duration,
+                usedMaxNum: data.max_num
             });
 
         } catch (error) {
@@ -2895,7 +2969,7 @@ async function processBatchImportUrls(event) {
             });
         }
 
-        // 更新进度（如果通知还存在）
+        // 更新进度
         if (progressInfo && progressInfo.parentNode) {
             const messageElement = progressInfo.querySelector('.notification-message');
             if (messageElement) {
@@ -2910,7 +2984,12 @@ async function processBatchImportUrls(event) {
     }
 
     // 显示结果
-    const resultMessage = `批量导入完成！\n成功: ${successCount} 个\n失败: ${failureCount} 个`;
+    const customConfigCount = results.filter(r => r.status === 'success' && (r.usedDuration !== defaultDuration || r.usedMaxNum !== defaultMaxNum)).length;
+    let resultMessage = `批量导入完成！\n成功: ${successCount} 个\n失败: ${failureCount} 个`;
+
+    if (customConfigCount > 0) {
+        resultMessage += `\n其中 ${customConfigCount} 个使用了解析的自定义配置`;
+    }
 
     if (failureCount === 0) {
         showSuccess('导入完成', resultMessage);
