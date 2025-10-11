@@ -1,4 +1,5 @@
 import datetime
+from time import sleep
 from typing import Any
 
 from flask import jsonify, request
@@ -9,7 +10,7 @@ from app.api import bp
 from app.auth.decorators import login_required, admin_required
 from app.models import UrlData
 from app.models.config_data import ConfigData
-from app.utils.vmos import get_phone_list, start_app, stop_app
+from app.utils.vmos import get_phone_list, start_app, stop_app, open_root
 
 
 def get_current_pkg_names():
@@ -109,6 +110,11 @@ def start():
         pkg_names = get_current_pkg_names()
 
         # 启动VMOS应用
+        open_root(
+            pad_code_list=[pad_code],
+            pkg_name=pkg_names['pkg_name'],
+        )
+        sleep(5)
         result = start_app([pad_code], pkg_name=pkg_names['pkg_name'])
         logger.success(f"{pad_code}: 启动成功, {result}")
 
@@ -364,6 +370,10 @@ def batch_start_machines():
             if machine.pade_code:
                 try:
                     # 调用VMOS API启动机器
+                    open_root(
+                        pad_code_list=[machine.pade_code], pkg_name=Config.PKG_NAME
+                    )
+                    sleep(5)
                     response = start_app([machine.pade_code], pkg_name=Config.PKG_NAME)
                     results.append({
                         'machine_id': machine.id,
