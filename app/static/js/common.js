@@ -1,6 +1,11 @@
+// 全局变量存储选中的机器
+let selectedVmosMachines = new Set();
+
 async function showVmosMachinesList() {
     try {
-        // 显示加载状态
+        // 重置选择
+        selectedVmosMachines.clear();
+
         const vmosModal = document.getElementById('vmosMachinesModal');
         vmosModal.style.display = 'block';
 
@@ -33,11 +38,21 @@ async function showVmosMachinesList() {
         if (result.new_machines_count > 0) {
             html += `
                 <div style="margin-bottom: 2rem;">
-                    <h5 style="color: #f57c00;">🆕 新发现的机器 (${result.new_machines_count} 台)</h5>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h5 style="color: #f57c00; margin: 0;">🆕 新发现的机器 (${result.new_machines_count} 台)</h5>
+                        <div style="display: flex; gap: 1rem; align-items: center;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" id="selectAllVmosMachines" onchange="toggleSelectAllVmosMachines()" style="transform: scale(1.2);">
+                                <span style="font-weight: bold;">全选/取消全选</span>
+                            </label>
+                            <span id="selectedVmosCount" style="color: #666; font-size: 0.9rem;">已选择: 0 台</span>
+                        </div>
+                    </div>
                     <div style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
                         <table style="width: 100%; border-collapse: collapse;">
                             <thead style="background: #f8f9fa; position: sticky; top: 0;">
                                 <tr>
+                                    <th style="padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: center; width: 60px;">选择</th>
                                     <th style="padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left;">机器代码</th>
                                     <th style="padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left;">机器名称</th>
                                     <th style="padding: 0.5rem; border-bottom: 1px solid #ddd; text-align: left;">类型</th>
@@ -49,7 +64,13 @@ async function showVmosMachinesList() {
 
             result.new_machines.forEach(machine => {
                 html += `
-                    <tr>
+                    <tr class="vmos-machine-item" data-pad-code="${machine.padCode}">
+                        <td style="padding: 0.5rem; border-bottom: 1px solid #eee; text-align: center;">
+                            <input type="checkbox" class="vmos-machine-checkbox" 
+                                   value="${machine.padCode}" 
+                                   onchange="toggleVmosMachineSelection('${machine.padCode}')"
+                                   style="transform: scale(1.2); cursor: pointer;">
+                        </td>
                         <td style="padding: 0.5rem; border-bottom: 1px solid #eee; font-family: monospace;">${machine.padCode}</td>
                         <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">${machine.padName || '-'}</td>
                         <td style="padding: 0.5rem; border-bottom: 1px solid #eee;">${machine.goodName || '-'}</td>
@@ -67,8 +88,10 @@ async function showVmosMachinesList() {
                         </table>
                     </div>
                     <div style="margin-top: 1rem; text-align: center;">
-                        <button class="btn btn-success" onclick="syncNewMachinesFromModal()" style="margin-right: 1rem;">
-                            ✅ 添加这些新机器到系统
+                        <button class="btn btn-success" onclick="syncSelectedVmosMachines()" 
+                                id="syncSelectedBtn" disabled
+                                style="background: linear-gradient(45deg, #28a745, #20c997);">
+                            ✅ 添加选中的机器 (<span id="syncBtnCount">0</span>)
                         </button>
                     </div>
                 </div>
@@ -121,6 +144,139 @@ async function showVmosMachinesList() {
         console.error('获取VMOS机器列表失败:', error);
         document.getElementById('vmosMachinesContent').innerHTML =
             '<p style="color: #dc3545; text-align: center;">获取VMOS机器列表失败</p>';
+    }
+}
+
+// 切换单个机器的选择状态
+function toggleVmosMachineSelection(padCode) {
+    if (selectedVmosMachines.has(padCode)) {
+        selectedVmosMachines.delete(padCode);
+    } else {
+        selectedVmosMachines.add(padCode);
+    }
+    updateVmosSelectionUI();
+}
+
+// 切换全选/取消全选
+function toggleSelectAllVmosMachines() {
+    const selectAllCheckbox = document.getElementById('selectAllVmosMachines');
+    const checkboxes = document.querySelectorAll('.vmos-machine-checkbox');
+
+    if (selectAllCheckbox.checked) {
+        // 全选
+        checkboxes.forEach(checkbox => {
+            selectedVmosMachines.add(checkbox.value);
+            checkbox.checked = true;
+        });
+    } else {
+        // 取消全选
+        selectedVmosMachines.clear();
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
+    }
+
+    updateVmosSelectionUI();
+}
+
+// 更新选择UI状态
+function updateVmosSelectionUI() {
+    // 更新计数显示
+    const countElement = document.getElementById('selectedVmosCount');
+    const btnCountElement = document.getElementById('syncBtnCount');
+    const syncBtn = document.getElementById('syncSelectedBtn');
+
+    if (countElement) {
+        countElement.textContent = `已选择: ${selectedVmosMachines.size} 台`;
+    }
+
+    if (btnCountElement) {
+        btnCountElement.textContent = selectedVmosMachines.size;
+    }
+
+    // 更新按钮状态
+    if (syncBtn) {
+        syncBtn.disabled = selectedVmosMachines.size === 0;
+    }
+
+    // 更新全选复选框状态
+    const selectAllCheckbox = document.getElementById('selectAllVmosMachines');
+    const checkboxes = document.querySelectorAll('.vmos-machine-checkbox');
+
+    if (selectAllCheckbox && checkboxes.length > 0) {
+        const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        if (checkedCount === 0) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+        } else if (checkedCount === checkboxes.length) {
+            selectAllCheckbox.checked = true;
+            selectAllCheckbox.indeterminate = false;
+        } else {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = true;
+        }
+    }
+}
+
+// 同步选中的机器
+async function syncSelectedVmosMachines() {
+    if (selectedVmosMachines.size === 0) {
+        showError('操作失败', '请至少选择一台机器');
+        return;
+    }
+
+    const selectedCodes = Array.from(selectedVmosMachines);
+
+    if (!await showConfirm(
+        '确认添加',
+        `确定要添加选中的 ${selectedCodes.length} 台机器吗？`,
+        'primary'
+    )) {
+        return;
+    }
+
+    try {
+        // 显示加载状态
+        const syncBtn = document.getElementById('syncSelectedBtn');
+        if (syncBtn) {
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '<span class="loading-indicator"></span> 添加中...';
+        }
+
+        // 调用API，传递选中的机器代码
+        const result = await apiCall('/api/machines/sync-new', {
+            method: 'POST',
+            body: JSON.stringify({
+                pad_codes: selectedCodes
+            })
+        });
+
+        showSuccess("成功", `成功添加 ${result.new_machines_count} 台机器！`);
+
+        // 关闭模态框
+        document.getElementById('vmosMachinesModal').style.display = 'none';
+
+        // 刷新机器列表
+        if (typeof loadMachines === 'function') {
+            await loadMachines();
+        }
+        if (typeof loadMachineList === 'function') {
+            await loadMachineList();
+        }
+        if (typeof loadMachineManagementList === 'function') {
+            await loadMachineManagementList();
+        }
+
+    } catch (error) {
+        console.error('添加机器失败:', error);
+        showError("失败", '添加机器失败，请重试');
+    } finally {
+        // 恢复按钮状态
+        const syncBtn = document.getElementById('syncSelectedBtn');
+        if (syncBtn) {
+            syncBtn.disabled = false;
+            syncBtn.innerHTML = `✅ 添加选中的机器 (<span id="syncBtnCount">${selectedVmosMachines.size}</span>)`;
+        }
     }
 }
 

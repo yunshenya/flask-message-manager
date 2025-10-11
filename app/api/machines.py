@@ -463,8 +463,12 @@ def batch_stop_machines():
 @bp.route('/machines/sync-new', methods=['POST'])
 @admin_required
 def sync_new_machines():
-    """从VMOS API同步新机器"""
+    """从VMOS API同步新机器（支持选择性同步）"""
     try:
+        # 获取请求数据
+        data = request.get_json() or {}
+        selected_pad_codes = data.get('pad_codes')  # 可选：指定要同步的机器代码列表
+
         vmos_response = get_phone_list()
         if not vmos_response or 'data' not in vmos_response:
             return jsonify({'error': 'Failed to fetch machines from VMOS API'}), 500
@@ -478,11 +482,16 @@ def sync_new_machines():
         for vmos_machine in vmos_machines:
             pade_code = vmos_machine.get('padCode')
             if pade_code and pade_code not in existing_codes:
-                new_machines.append(vmos_machine)
+                # 如果指定了要同步的机器列表，则只添加列表中的机器
+                if selected_pad_codes is None or pade_code in selected_pad_codes:
+                    new_machines.append(vmos_machine)
 
         if not new_machines:
+            message = '没有找到要添加的新机器'
+            if selected_pad_codes:
+                message = f'选中的 {len(selected_pad_codes)} 台机器可能已经存在于系统中'
             return jsonify({
-                'message': 'No new machines found',
+                'message': message,
                 'new_machines_count': 0,
                 'existing_machines_count': len(existing_codes)
             })
@@ -522,7 +531,7 @@ def sync_new_machines():
         db.session.commit()
 
         return jsonify({
-            'message': f'Successfully synchronized {len(created_machines)} new machines',
+            'message': f'成功同步 {len(created_machines)} 台新机器',
             'new_machines_count': len(created_machines),
             'existing_machines_count': len(existing_codes),
             'created_machines': created_machines,
@@ -532,7 +541,6 @@ def sync_new_machines():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to sync new machines: {str(e)}'}), 500
-
 
 @bp.route('/machines/vmos-list', methods=['GET'])
 @admin_required

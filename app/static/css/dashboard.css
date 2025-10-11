@@ -1707,3 +1707,20 @@ body {
         height: 40px;
     }
 }
+
+/* VMOS机器选择样式 */
+.vmos-machine-item {
+    transition: background-color 0.2s ease;
+}
+
+.vmos-machine-item:hover {
+    background-color: #f8f9fa !important;
+}
+
+.vmos-machine-checkbox:checked {
+    accent-color: #28a745;
+}
+
+.vmos-machine-item:has(.vmos-machine-checkbox:checked) {
+    background-color: #e8f5e8 !important;
+}
