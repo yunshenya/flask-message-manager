@@ -731,31 +731,127 @@ async function loadMachineList() {
         availableMachines = machines;
 
         const select = document.getElementById('machineSelect');
+        const customOptions = document.getElementById('customMachineOptions');
+
         select.innerHTML = '';
+        customOptions.innerHTML = '';
 
         if (machines.length === 0) {
             select.innerHTML = '<option value="">无可用机器</option>';
+            document.getElementById('selectedMachineText').textContent = '无可用机器';
             return;
         }
 
+        // 按名称首字母分组
+        const groupA = [];
+        const groupB = [];
+        const groupOther = [];
+
+        machines.forEach(machine => {
+            const machineName = machine.name || '未命名';
+            const firstChar = machineName.charAt(0).toUpperCase();
+
+            if (firstChar === 'A') {
+                groupA.push(machine);
+            } else if (firstChar === 'B') {
+                groupB.push(machine);
+            } else {
+                groupOther.push(machine);
+            }
+        });
+
+        // 构建自定义选择器内容
+        let optionsHtml = '';
+
+        // A组
+        if (groupA.length > 0) {
+            optionsHtml += `
+                <div class="option-group">
+                    <div class="option-group-header" data-group="groupA" onclick="toggleGroup('groupA')">
+                        <span>📁 A组机器 <span class="group-count">${groupA.length}</span></span>
+                        <span class="group-toggle">▼</span>
+                    </div>
+                    <div class="option-group-content" id="groupA">
+                        ${groupA.map(machine => {
+                const machineName = machine.name || '未命名';
+                const machineCode = machine.pade_code || '无代码';
+                return `<div class="custom-option" data-machine-id="${machine.id}" 
+                                         onclick="selectMachine(${machine.id}, '${machineName.replace(/'/g, "\\'")}', '${machineCode}')">
+                                        ${machineName} (${machineCode})
+                                    </div>`;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // B组
+        if (groupB.length > 0) {
+            optionsHtml += `
+                <div class="option-group">
+                    <div class="option-group-header" data-group="groupB" onclick="toggleGroup('groupB')">
+                        <span>📁 B组机器 <span class="group-count">${groupB.length}</span></span>
+                        <span class="group-toggle">▼</span>
+                    </div>
+                    <div class="option-group-content" id="groupB">
+                        ${groupB.map(machine => {
+                const machineName = machine.name || '未命名';
+                const machineCode = machine.pade_code || '无代码';
+                return `<div class="custom-option" data-machine-id="${machine.id}" 
+                                         onclick="selectMachine(${machine.id}, '${machineName.replace(/'/g, "\\'")}', '${machineCode}')">
+                                        ${machineName} (${machineCode})
+                                    </div>`;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 其他组
+        if (groupOther.length > 0) {
+            optionsHtml += `
+                <div class="option-group">
+                    <div class="option-group-header" data-group="groupOther" onclick="toggleGroup('groupOther')">
+                        <span>📁 其他机器 <span class="group-count">${groupOther.length}</span></span>
+                        <span class="group-toggle">▼</span>
+                    </div>
+                    <div class="option-group-content" id="groupOther">
+                        ${groupOther.map(machine => {
+                const machineName = machine.name || '未命名';
+                const machineCode = machine.pade_code || '无代码';
+                return `<div class="custom-option" data-machine-id="${machine.id}" 
+                                         onclick="selectMachine(${machine.id}, '${machineName.replace(/'/g, "\\'")}', '${machineCode}')">
+                                        ${machineName} (${machineCode})
+                                    </div>`;
+            }).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        customOptions.innerHTML = optionsHtml;
+
+        // 同步到原生 select（用于存储值）
         machines.forEach(machine => {
             const option = document.createElement('option');
             option.value = machine.id;
-            const machineName = machine.name || '未命名';
-            const machineCode = machine.pade_code || '无代码';
-            option.textContent = `${machineName} (${machineCode})`;
             select.appendChild(option);
         });
 
+        // 设置默认选中
         if (!currentConfigId && machines.length > 0) {
             currentConfigId = machines[0].id;
             select.value = currentConfigId;
+            const firstMachine = machines[0];
+            document.getElementById('selectedMachineText').textContent =
+                `${firstMachine.name || '未命名'} (${firstMachine.pade_code || '无代码'})`;
+            document.querySelector(`[data-machine-id="${currentConfigId}"]`)?.classList.add('selected');
             updateCurrentMachineInfo();
         }
 
     } catch (error) {
         console.error('加载机器列表失败:', error);
-        document.getElementById('machineSelect').innerHTML = '<option value="">加载失败</option>';
+        document.getElementById('selectedMachineText').textContent = '加载失败';
     }
 }
 
@@ -3614,5 +3710,68 @@ document.addEventListener('keydown', function(e) {
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
         e.preventDefault();
         showBatchDeleteUrlModal().then(() => {});
+    }
+});
+
+// ================================
+// 自定义可折叠选择器功能
+// ================================
+
+function toggleCustomSelect() {
+    const select = document.getElementById('customMachineSelect');
+    const options = document.getElementById('customMachineOptions');
+
+    select.classList.toggle('active');
+
+    if (options.style.display === 'none') {
+        options.style.display = 'block';
+    } else {
+        options.style.display = 'none';
+    }
+}
+
+function closeCustomSelect() {
+    const select = document.getElementById('customMachineSelect');
+    const options = document.getElementById('customMachineOptions');
+
+    select.classList.remove('active');
+    options.style.display = 'none';
+}
+
+function toggleGroup(groupId) {
+    const header = document.querySelector(`[data-group="${groupId}"]`);
+    const content = document.getElementById(groupId);
+
+    if (header && content) {
+        header.classList.toggle('collapsed');
+        content.classList.toggle('collapsed');
+    }
+}
+
+function selectMachine(machineId, machineName, machineCode) {
+    // 更新隐藏的原生 select
+    document.getElementById('machineSelect').value = machineId;
+
+    // 更新显示文本
+    document.getElementById('selectedMachineText').textContent = `${machineName} (${machineCode})`;
+
+    // 更新选中状态样式
+    document.querySelectorAll('.custom-option').forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    document.querySelector(`[data-machine-id="${machineId}"]`)?.classList.add('selected');
+
+    // 关闭下拉框
+    closeCustomSelect();
+
+    // 触发切换机器
+    switchMachine();
+}
+
+// 点击外部关闭下拉框
+document.addEventListener('click', function(e) {
+    const wrapper = document.querySelector('.custom-select-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        closeCustomSelect();
     }
 });

@@ -36,10 +36,23 @@
     <div class="machine-selector">
         <h3>🖥️ 机器管理</h3>
         <div class="machine-select-group">
-            <label for="machineSelect">选择机器:</label>
-            <select class="machine-select" id="machineSelect" onchange="switchMachine()">
-                <option value="">加载中...</option>
-            </select>
+            <label>选择机器:</label>
+            <!-- 自定义下拉选择器 -->
+            <div class="custom-select-wrapper">
+                <div class="custom-select" id="customMachineSelect" onclick="toggleCustomSelect()">
+                    <span id="selectedMachineText">加载中...</span>
+                    <span class="select-arrow">▼</span>
+                </div>
+                <div class="custom-options" id="customMachineOptions" style="display: none;">
+                    <!-- 选项将通过 JavaScript 动态生成 -->
+                </div>
+            </div>
+            <!-- 保留原生 select 用于存储值 -->
+            <label for="machineSelect">
+                <select class="machine-select" id="machineSelect" style="display: none;" onchange="switchMachine()">
+                    <option value="">加载中...</option>
+                </select>
+            </label>
             <button class="btn btn-info btn-sm" onclick="refreshMachineList()">
                 <span id="refreshIcon">🔄</span> 刷新
             </button>
